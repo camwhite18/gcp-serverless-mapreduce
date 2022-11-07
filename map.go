@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
 	"github.com/cloudevents/sdk-go/v2/event"
+	"hash/fnv"
 	"log"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -26,11 +28,11 @@ type WordData struct {
 func mapper(ctx context.Context, e event.Event) error {
 	var msg MessagePublishedData
 	if err := e.DataAs(&msg); err != nil {
-		return fmt.Errorf("event.DataAs: %v", err)
+		return fmt.Errorf("error getting data from event: %v", err)
 	}
 	client, err := pubsub.NewClient(ctx, "serverless-mapreduce")
 	if err != nil {
-		return err
+		return fmt.Errorf("error creating pubsub client: %v", err)
 	}
 	defer client.Close()
 	words := strings.Split(string(msg.Message.Data), " ")
@@ -58,7 +60,8 @@ func sendToReducer(ctx context.Context, wg *sync.WaitGroup, client *pubsub.Clien
 		log.Printf("Error marshalling wordData: %v", err)
 	}
 	// send to reducer
-	topic := client.Topic("mapreduce-shuffler")
+	reducerNum := findReducerNum(sortedWord)
+	topic := client.Topic("mapreduce-shuffler-" + reducerNum)
 	result := topic.Publish(ctx, &pubsub.Message{
 		Data:        wordDataJson,
 		PublishTime: time.Now(),
@@ -68,4 +71,11 @@ func sendToReducer(ctx context.Context, wg *sync.WaitGroup, client *pubsub.Clien
 		log.Printf("Error sending to reducer: %v", err)
 	}
 	wg.Done()
+}
+
+func findReducerNum(s string) string {
+	h := fnv.New32a()
+	h.Write([]byte(s))
+	hashedString := h.Sum32()
+	return strconv.Itoa(int(hashedString % 10))
 }

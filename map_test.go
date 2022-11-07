@@ -24,7 +24,7 @@ func setupTest(tb testing.TB) (func(tb testing.TB), *pubsub.Subscription) {
 	if err != nil {
 		tb.Fatalf("Error creating pubsub client: %v", err)
 	}
-	t, err := client.CreateTopic(context.Background(), "mapreduce-shuffler")
+	t, err := client.CreateTopic(context.Background(), "mapreduce-shuffler-6")
 	if err != nil {
 		tb.Fatalf("Error creating topic: %v", err)
 	}
