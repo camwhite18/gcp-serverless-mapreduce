@@ -2,3 +2,6 @@
 .idea/
 *.swp
 .vscode/
+
+# Other
+coc105-gutenburg-5000books/
