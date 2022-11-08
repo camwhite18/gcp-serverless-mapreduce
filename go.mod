@@ -8,4 +8,6 @@ require (
 	cloud.google.com/go/storage v1.27.0
 	github.com/GoogleCloudPlatform/functions-framework-go v1.6.1
 	github.com/cloudevents/sdk-go/v2 v2.12.0
+	github.com/stretchr/testify v1.8.1
+	google.golang.org/api v0.103.0
 )

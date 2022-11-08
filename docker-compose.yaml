@@ -6,3 +6,11 @@ services:
     ports:
       - "8085:8085"
     command: ["gcloud", "beta", "emulators", "pubsub", "start", "--project", "serverless-mapreduce", "--host-port", "0.0.0.0:8085"]
+  storage-emulator:
+    image: oittaa/gcp-storage-emulator
+    environment:
+      - PORT=9023
+    expose:
+      - "9023"
+    volumes:
+      - ${PWD}/cloudstorage:/storage

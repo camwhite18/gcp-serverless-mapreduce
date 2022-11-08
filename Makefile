@@ -13,23 +13,56 @@ create-output-bucket:
 	@gsutil mb -l $(GCP_REGION) gs://$(OUTPUT_BUCKET_NAME)
 
 create-topics:
+	@gcloud pubsub topics create mapreduce-splitter-0
 	@gcloud pubsub topics create mapreduce-mapper
 	@gcloud pubsub topics create mapreduce-shuffler
 	@gcloud pubsub topics create mapreduce-reducer
 
+create-api-gateway:
+	@gcloud api-gateway api-configs create mapreduce-api \
+		--api=mapreduce-api \
+		--openapi-spec=openapi.yaml \
+		--project=$(GCP_PROJECT) \
+		--backend-auth-service-account=mapreduce-api@$(GCP_PROJECT).iam.gserviceaccount.com
+	@gcloud api-gateway gateways create mapreduce-gateway \
+		--api=mapreduce-api \
+		--api-config=mapreduce-api \
+		--location=$(GCP_REGION) \
+		--project=$(GCP_PROJECT)
 
-deploy-splitter:
-	@gcloud functions deploy splitter \
+remove-api-gateway:
+	@gcloud api-gateway gateways delete mapreduce-gateway \
+		--location=$(GCP_REGION) \
+		--project=$(GCP_PROJECT)
+	@gcloud api-gateway api-configs delete mapreduce-api \
+		--api=mapreduce-api \
+		--project=$(GCP_PROJECT)
+
+deploy-start-mapreduce:
+	@gcloud functions deploy start-mapreduce \
 		--gen2 \
 		--runtime=go116 \
-		--trigger-event-filters="bucket=$(INPUT_BUCKET_NAME)" \
-		--trigger-event-filters="type=google.cloud.storage.object.v1.finalized" \
+		--trigger-http \
 		--source=. \
-		--entry-point=Splitter \
-		--region=$(GCP_REGION)
+		--entry-point StartMapreduce \
+		--region=$(GCP_REGION) \
+		--project=$(GCP_PROJECT)
+
+remove-start-mapreduce:
+	@gcloud functions delete start-mapreduce --region=$(GCP_REGION) --project=$(GCP_PROJECT) --gen2
+
+deploy-splitter:
+	@gcloud functions deploy splitter-0 \
+		--gen2 \
+		--runtime=go116 \
+		--trigger-topic mapreduce-splitter-0 \
+		--source=. \
+		--entry-point Splitter \
+		--region=$(GCP_REGION) \
+        --project=$(GCP_PROJECT)
 
 remove-splitter:
-	@gcloud functions delete splitter --region=$(GCP_REGION) --gen2
+	@gcloud functions delete splitter-0 --region=$(GCP_REGION) --project=$(GCP_PROJECT) --gen2
 
 deploy-mapper:
 	@gcloud functions deploy mapper \
@@ -38,22 +71,26 @@ deploy-mapper:
 		--trigger-topic mapreduce-mapper \
 		--source=. \
 		--entry-point Mapper \
-		--region $(GCP_REGION)
+		--region $(GCP_REGION) \
+        --project=$(GCP_PROJECT)
 
 remove-mapper:
-	@gcloud functions delete mapper --region=$(GCP_REGION) --gen2
+	@gcloud functions delete mapper --region=$(GCP_REGION) --project=$(GCP_PROJECT) --gen2
 
-deploy-shuffler:
-	@gcloud functions deploy shuffler \
-		--gen2 \
-		--runtime go116 \
-		--trigger-topic mapreduce-shuffler \
-		--source=. \
-		--entry-point Shuffler \
-		--region $(GCP_REGION)
+#deploy-shuffler:
+#	@gcloud functions deploy shuffler \
+#		--gen2 \
+#		--runtime go116 \
+#		--trigger-topic mapreduce-shuffler \
+#		--source=. \
+#		--entry-point Shuffler \
+#		--region $(GCP_REGION) \
+#		--project=$(GCP_PROJECT)
+deply-shuffler:
+	@gcloud dataflow
 
 remove-shuffler:
-	@gcloud functions delete shuffler --region=$(GCP_REGION) --gen2
+	@gcloud functions delete shuffler --region=$(GCP_REGION) --project=$(GCP_PROJECT) --gen2
 
 deploy-reducer:
 	@gcloud functions deploy reducer \
@@ -62,10 +99,11 @@ deploy-reducer:
 		--trigger-topic mapreduce-reducer \
 		--source=. \
 		--entry-point Reducer \
-		--region $(GCP_REGION)
+		--region $(GCP_REGION) \
+        --project=$(GCP_PROJECT)
 
 remove-reducer:
-	@gcloud functions delete reducer --region=$(GCP_REGION) --gen2
+	@gcloud functions delete reducer --region=$(GCP_REGION) --project=$(GCP_PROJECT) --gen2
 
 deploy: create-input-bucket create-output-bucket create-topics deploy-splitter deploy-mapper deploy-shuffler deploy-reducer
 
@@ -76,3 +114,9 @@ create-pubsub-emulator:
 
 remove-pubsub-emulator:
 	@docker-compose rm -s pubsub-emulator
+
+create-storage-emulator:
+	@docker-compose run -dp 9023:9023 storage-emulator
+
+remove-storage-emulator:
+	@docker-compose rm -s storage-emulator
