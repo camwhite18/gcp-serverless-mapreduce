@@ -20,13 +20,17 @@ func init() {
 	functions.CloudEvent("Mapper", mapper)
 }
 
+type MapperData struct {
+	Text []string `json:"text"`
+}
+
 type WordData struct {
 	SortedWord string
 	Word       string
 }
 
 func mapper(ctx context.Context, e event.Event) error {
-	var msg MessagePublishedData
+	var msg MapperData
 	if err := e.DataAs(&msg); err != nil {
 		return fmt.Errorf("error getting data from event: %v", err)
 	}
@@ -35,9 +39,8 @@ func mapper(ctx context.Context, e event.Event) error {
 		return fmt.Errorf("error creating pubsub client: %v", err)
 	}
 	defer client.Close()
-	words := strings.Split(string(msg.Message.Data), " ")
 	var wg sync.WaitGroup
-	for _, word := range words {
+	for _, word := range msg.Text {
 		wg.Add(1)
 		go sendToReducer(ctx, &wg, client, word)
 	}

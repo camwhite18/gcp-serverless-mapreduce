@@ -10,14 +10,19 @@ import (
 	"time"
 )
 
-func TestMapper(t *testing.T) {
+func TestSplitter(t *testing.T) {
 	// Setup test
-	teardown, subscription := setupTest(t, "mapreduce-shuffler-2")
+	teardown, subscription := setupTest(t, "mapreduce-mapper-0")
 	defer teardown(t)
 	// Given
 	// Create a message
-	inputData := []string{"quick"}
-	message := MapperData{Text: inputData}
+	inputData := "The quick brown fox jumps over the lazy dog"
+	message := MessagePublishedData{
+		Message: PubSubMessage{
+			Data:       []byte(inputData),
+			Attributes: map[string]string{"splitter": "0"},
+		},
+	}
 	// Create a CloudEvent to be sent to the mapper
 	e := event.New()
 	e.SetDataContentType("application/json")
@@ -26,20 +31,19 @@ func TestMapper(t *testing.T) {
 		t.Fatalf("Error setting event data: %v", err)
 	}
 
-	expectedResult := WordData{
-		SortedWord: "cikqu",
-		Word:       inputData[0],
+	expectedResult := MapperData{
+		Text: []string{"quick", "brown", "fox", "jumps", "over", "lazy", "dog"},
 	}
 
 	// When
-	err = mapper(context.Background(), e)
+	err = splitter(context.Background(), e)
 
 	// Then
 	// Ensure there are no errors returned
 	assert.Nil(t, err)
 	// The subscription will listen forever unless given a context with a timeout
 	ctx, _ := context.WithTimeout(context.Background(), 1*time.Second)
-	var actualResult WordData
+	var actualResult MapperData
 	err = subscription.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
 		// Unmarshal the message data into the WordData struct
 		err := json.Unmarshal(msg.Data, &actualResult)
@@ -52,4 +56,16 @@ func TestMapper(t *testing.T) {
 	assert.Equal(t, expectedResult, actualResult)
 	// Ensure there are no errors returned by the receiver
 	assert.Nil(t, err)
+}
+
+func TestProcessText(t *testing.T) {
+	// Given
+	inputText := []byte("The quick brown fox jumps over the lazy dog.")
+	expectedResult := []byte("quick brown fox jumps over lazy dog")
+
+	// When
+	actualResult := processText(inputText)
+
+	// Then
+	assert.Equal(t, expectedResult, actualResult)
 }

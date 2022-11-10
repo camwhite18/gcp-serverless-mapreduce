@@ -10,8 +10,8 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"regexp"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 )
@@ -87,7 +87,8 @@ func sendToSplitter(ctx context.Context, wg *sync.WaitGroup, bucketName string, 
 	}
 	defer client.Close()
 	// Set the topic the client will publish to
-	topic := client.Topic("mapreduce-splitter-" + strconv.Itoa(instanceNo))
+	splitterNo := strconv.Itoa(instanceNo)
+	topic := client.Topic("mapreduce-splitter-" + splitterNo)
 	for _, file := range files {
 		// Read the contents of the file
 		data, err := readFileFromBucket(ctx, bucketName, file)
@@ -96,7 +97,8 @@ func sendToSplitter(ctx context.Context, wg *sync.WaitGroup, bucketName string, 
 		}
 		// Send the contents to the splitter instance
 		result := topic.Publish(ctx, &pubsub.Message{
-			Data:        data,
+			Data:        removeBookHeaderAndFooter(data),
+			Attributes:  map[string]string{"splitter": splitterNo},
 			PublishTime: time.Now(),
 		})
 		// Get the result of the publish
@@ -109,7 +111,6 @@ func sendToSplitter(ctx context.Context, wg *sync.WaitGroup, bucketName string, 
 }
 
 func readFileFromBucket(ctx context.Context, bucketName, objectName string) ([]byte, error) {
-	//TODO: Need to remove stopwords and punctuation
 	client, err := storage.NewClient(ctx)
 	if err != nil {
 		return nil, err
@@ -123,53 +124,27 @@ func readFileFromBucket(ctx context.Context, bucketName, objectName string) ([]b
 	if err != nil {
 		return nil, err
 	}
-	return processText(data), nil
+	return data, nil
 }
 
-func processText(data []byte) []byte {
-	// Create a map containing all the stopwords as keys since Golang doesn't have sets
-	stopwords := map[string]struct{}{"'tis": {}, "'twas": {}, "a": {}, "able": {}, "about": {}, "across": {},
-		"after": {}, "ain't": {}, "all": {}, "almost": {}, "also": {}, "am": {}, "among": {}, "an": {}, "and": {},
-		"any": {}, "are": {}, "aren't": {}, "as": {}, "at": {}, "be": {}, "because": {}, "been": {}, "but": {},
-		"by": {}, "can": {}, "can't": {}, "cannot": {}, "could": {}, "could've": {}, "couldn't": {}, "dear": {},
-		"did": {}, "didn't": {}, "do": {}, "does": {}, "doesn't": {}, "don't": {}, "either": {}, "else": {}, "ever": {},
-		"every": {}, "for": {}, "from": {}, "get": {}, "got": {}, "had": {}, "has": {}, "hasn't": {}, "have": {},
-		"he": {}, "he'd": {}, "he'll": {}, "he's": {}, "her": {}, "hers": {}, "him": {}, "his": {}, "how": {},
-		"how'd": {}, "how'll": {}, "how's": {}, "however": {}, "i": {}, "i'd": {}, "i'll": {}, "i'm": {}, "i've": {},
-		"if": {}, "in": {}, "into": {}, "is": {}, "isn't": {}, "it": {}, "it's": {}, "its": {}, "just": {}, "least": {},
-		"let": {}, "like": {}, "likely": {}, "may": {}, "me": {}, "might": {}, "might've": {}, "mightn't": {},
-		"most": {}, "must": {}, "must've": {}, "mustn't": {}, "my": {}, "neither": {}, "no": {}, "nor": {}, "not": {},
-		"of": {}, "off": {}, "often": {}, "on": {}, "only": {}, "or": {}, "other": {}, "our": {}, "own": {},
-		"rather": {}, "said": {}, "say": {}, "says": {}, "shan't": {}, "she": {}, "she'd": {}, "she'll": {},
-		"she's": {}, "should": {}, "should've": {}, "shouldn't": {}, "since": {}, "so": {}, "some": {}, "than": {},
-		"that": {}, "that'll": {}, "that's": {}, "the": {}, "their": {}, "them": {}, "then": {}, "there": {},
-		"there's": {}, "these": {}, "they": {}, "they'd": {}, "they'll": {}, "they're": {}, "they've": {}, "this": {},
-		"tis": {}, "to": {}, "too": {}, "twas": {}, "us": {}, "wants": {}, "was": {}, "wasn't": {}, "we": {},
-		"we'd": {}, "we'll": {}, "we're": {}, "were": {}, "weren't": {}, "what": {}, "what'd": {}, "what's": {},
-		"when": {}, "when'd": {}, "when'll": {}, "when's": {}, "where": {}, "where'd": {}, "where'll": {},
-		"where's": {}, "which": {}, "while": {}, "who": {}, "who'd": {}, "who'll": {}, "who's": {}, "whom": {},
-		"why": {}, "why'd": {}, "why'll": {}, "why's": {}, "will": {}, "with": {}, "won't": {}, "would": {},
-		"would've": {}, "wouldn't": {}, "yet": {}, "you": {}, "you'd": {}, "you'll": {}, "you're": {}, "you've": {},
-		"your": {},
+func removeBookHeaderAndFooter(data []byte) []byte {
+	// remove book header
+	re := regexp.MustCompile(`\*\*\*.*START OF TH(E|IS) PROJECT GUTENBERG EBOOK.*\*\*\*`)
+	// find the index of the occurrence of the header
+	index := re.FindStringIndex(string(data))
+	// remove the header
+	if index != nil {
+		data = data[index[1]+1:]
 	}
-	text := string(data)
-	words := strings.Fields(text)
-	processedText := make([]string, 0)
-	for i := 0; i < len(words); i++ {
-		// Convert to lowercase
-		words[i] = strings.ToLower(words[i])
-		// Remove stopwords
-		if _, ok := stopwords[words[i]]; ok {
-			words[i] = ""
-		}
-		// Remove punctuation
-		words[i] = strings.Trim(words[i], ".,;:!?\" ")
-		// Remove empty strings
-		if words[i] != "" {
-			processedText = append(processedText, words[i])
-		}
+	// remove book footer
+	re = regexp.MustCompile(`\*\*\*.*END OF TH(E|IS) PROJECT GUTENBERG EBOOK.*\*\*\*`)
+	// find the index of the occurrence of the footer
+	index = re.FindStringIndex(string(data))
+	// remove the footer
+	if index != nil {
+		data = data[:index[0]]
 	}
-	return []byte(strings.Join(processedText, " "))
+	return data
 }
 
 func writeResponse(w http.ResponseWriter, code int, message string) {

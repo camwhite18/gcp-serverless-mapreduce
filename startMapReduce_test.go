@@ -35,7 +35,8 @@ func createTestStorage(tb testing.TB) func(tb testing.TB) {
 	// Create a file in the bucket
 	object := bucket.Object("test.txt")
 	writer := object.NewWriter(ctx)
-	if _, err := writer.Write([]byte("The quick brown fox jumps over the lazy dog.")); err != nil {
+	if _, err := writer.Write([]byte("#This text will be removed# START OF THIS PROJECT GUTENBERG EBOOK The quick " +
+		"brown fox jumps over the lazy dog.")); err != nil {
 		tb.Fatalf("Error writing to bucket: %v", err)
 	}
 	if err := writer.Close(); err != nil {
@@ -71,7 +72,7 @@ func TestStartMapReduce(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	expectedResponse := `{"responseCode":200,"message":"MapReduce started successfully"}`
-	expectedResult := []byte("quick brown fox jumps over lazy dog")
+	expectedResult := []byte("The quick brown fox jumps over the lazy dog.")
 
 	// When
 	startMapreduce(rec, req)
@@ -81,22 +82,28 @@ func TestStartMapReduce(t *testing.T) {
 	assert.Equal(t, expectedResponse, rec.Body.String())
 	// The subscription will listen forever unless given a context with a timeout
 	ctx, _ := context.WithTimeout(context.Background(), 1*time.Second)
+	var actualResult []byte
 	err := subscription.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
 		// Ensure the message data matches the expected result
-		assert.Equal(t, expectedResult, msg.Data)
+		actualResult = msg.Data
 		msg.Ack()
 	})
+	assert.Equal(t, expectedResult, actualResult)
 	// Ensure there are no errors returned by the receiver
 	assert.Nil(t, err)
 }
 
-func TestProcessText(t *testing.T) {
+// TODO: Create tests for other responses
+
+func TestRemoveBookHeaderAndFooter(t *testing.T) {
 	// Given
-	inputText := []byte("The quick brown fox jumps over the lazy dog.")
-	expectedResult := []byte("quick brown fox jumps over lazy dog")
+	inputText := []byte(`#SOME BOOK HEADER# *** START OF THIS PROJECT GUTENBERG EBOOK SOME TITLE *** The quick brown fox jumps over the lazy dog.
+*** END OF THE PROJECT GUTENBERG EBOOK SOME TITLE *** #SOME BOOK FOOTER#`)
+	expectedResult := []byte(`The quick brown fox jumps over the lazy dog.
+`)
 
 	// When
-	actualResult := processText(inputText)
+	actualResult := removeBookHeaderAndFooter(inputText)
 
 	// Then
 	assert.Equal(t, expectedResult, actualResult)
