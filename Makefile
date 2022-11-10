@@ -12,12 +12,6 @@ upload-books:
 create-output-bucket:
 	@gsutil mb -l $(GCP_REGION) gs://$(OUTPUT_BUCKET_NAME)
 
-create-topics:
-	@gcloud pubsub topics create mapreduce-splitter-0
-	@gcloud pubsub topics create mapreduce-mapper
-	@gcloud pubsub topics create mapreduce-shuffler
-	@gcloud pubsub topics create mapreduce-reducer
-
 create-api-gateway:
 	@gcloud api-gateway api-configs create mapreduce-api \
 		--api=mapreduce-api \
@@ -52,60 +46,32 @@ remove-start-mapreduce:
 	@gcloud functions delete start-mapreduce --region=$(GCP_REGION) --project=$(GCP_PROJECT) --gen2
 
 deploy-splitter:
-	@gcloud functions deploy splitter-0 \
-		--gen2 \
-		--runtime=go116 \
-		--trigger-topic mapreduce-splitter-0 \
-		--source=. \
-		--entry-point Splitter \
-		--region=$(GCP_REGION) \
-        --project=$(GCP_PROJECT)
+	./scripts/deploy-splitters.sh
 
 remove-splitter:
-	@gcloud functions delete splitter-0 --region=$(GCP_REGION) --project=$(GCP_PROJECT) --gen2
+	./scripts/delete-splitters.sh
 
 deploy-mapper:
-	@gcloud functions deploy mapper \
-		--gen2 \
-		--runtime go116 \
-		--trigger-topic mapreduce-mapper \
-		--source=. \
-		--entry-point Mapper \
-		--region $(GCP_REGION) \
-        --project=$(GCP_PROJECT)
+	./scripts/deploy-mappers.sh
 
 remove-mapper:
-	@gcloud functions delete mapper --region=$(GCP_REGION) --project=$(GCP_PROJECT) --gen2
+	./scripts/delete-mappers.sh
 
 #deploy-shuffler:
-#	@gcloud functions deploy shuffler \
-#		--gen2 \
-#		--runtime go116 \
-#		--trigger-topic mapreduce-shuffler \
-#		--source=. \
-#		--entry-point Shuffler \
-#		--region $(GCP_REGION) \
-#		--project=$(GCP_PROJECT)
-deply-shuffler:
+#	./scripts/deploy-shufflers.sh
+deploy-shuffler:
 	@gcloud dataflow
 
 remove-shuffler:
-	@gcloud functions delete shuffler --region=$(GCP_REGION) --project=$(GCP_PROJECT) --gen2
+	./scripts/delete-shufflers.sh
 
 deploy-reducer:
-	@gcloud functions deploy reducer \
-		--gen2 \
-		--runtime go116 \
-		--trigger-topic mapreduce-reducer \
-		--source=. \
-		--entry-point Reducer \
-		--region $(GCP_REGION) \
-        --project=$(GCP_PROJECT)
+	./scripts/deploy-reducers.sh
 
 remove-reducer:
-	@gcloud functions delete reducer --region=$(GCP_REGION) --project=$(GCP_PROJECT) --gen2
+	./scripts/delete-reducers.sh
 
-deploy: create-input-bucket create-output-bucket create-topics deploy-splitter deploy-mapper deploy-shuffler deploy-reducer
+deploy: create-input-bucket create-output-bucket deploy-splitter deploy-mapper deploy-shuffler deploy-reducer
 
 remove: remove-splitter remove-mapper remove-shuffler remove-reducer
 
