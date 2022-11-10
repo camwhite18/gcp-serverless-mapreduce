@@ -80,8 +80,8 @@ func processText(data []byte) []string {
 	for i := 0; i < len(words); i++ {
 		// Convert to lowercase
 		words[i] = strings.ToLower(words[i])
-		// Remove stopwords
-		if _, ok := stopwords[words[i]]; ok {
+		// Remove stopwords and words containing numbers
+		if _, ok := stopwords[words[i]]; ok || strings.ContainsAny(words[i], "0123456789") {
 			words[i] = ""
 		}
 		// Remove punctuation

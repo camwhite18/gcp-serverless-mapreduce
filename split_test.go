@@ -16,7 +16,7 @@ func TestSplitter(t *testing.T) {
 	defer teardown(t)
 	// Given
 	// Create a message
-	inputData := "The quick brown fox jumps over the lazy dog"
+	inputData := "1. The quick brown fox jumps over the lazy dog"
 	message := MessagePublishedData{
 		Message: PubSubMessage{
 			Data:       []byte(inputData),
@@ -60,8 +60,8 @@ func TestSplitter(t *testing.T) {
 
 func TestProcessText(t *testing.T) {
 	// Given
-	inputText := []byte("The quick brown fox jumps over the lazy dog.")
-	expectedResult := []byte("quick brown fox jumps over lazy dog")
+	inputText := []byte("1. The quick brown fox jumps over the lazy dog.")
+	expectedResult := []string{"quick", "brown", "fox", "jumps", "over", "lazy", "dog"}
 
 	// When
 	actualResult := processText(inputText)
