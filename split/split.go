@@ -1,4 +1,4 @@
-package serverless_mapreduce
+package split
 
 import (
 	"cloud.google.com/go/pubsub"
@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
 	"github.com/cloudevents/sdk-go/v2/event"
+	"gitlab.com/cameron_w20/serverless-mapreduce"
+	"gitlab.com/cameron_w20/serverless-mapreduce/map"
 	"log"
 	"strings"
 	"time"
@@ -17,11 +19,11 @@ func init() {
 }
 
 func splitter(ctx context.Context, e event.Event) error {
-	var msg MessagePublishedData
+	var msg serverless_mapreduce.MessagePublishedData
 	if err := e.DataAs(&msg); err != nil {
 		return fmt.Errorf("error getting data from event: %v", err)
 	}
-	mapperData := MapperData{
+	mapperData := _map.MapperData{
 		Text: processText(msg.Message.Data),
 	}
 	mapperDataMarshalled, err := json.Marshal(mapperData)

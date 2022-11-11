@@ -1,4 +1,4 @@
-package serverless_mapreduce
+package start
 
 import (
 	"cloud.google.com/go/pubsub"

@@ -23,7 +23,7 @@ for ((i=0;i<num_reducers;i++)) do
   		--gen2 \
   		--runtime=go116 \
   		--trigger-topic mapreduce-reducer-"$i" \
-  		--source=. \
+  		--source=./reduce \
   		--entry-point Reducer \
   		--region=europe-west2 \
       --project=serverless-mapreduce) ; then

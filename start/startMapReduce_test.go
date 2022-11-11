@@ -1,10 +1,11 @@
-package serverless_mapreduce
+package start
 
 import (
 	"cloud.google.com/go/pubsub"
 	"cloud.google.com/go/storage"
 	"context"
 	"github.com/stretchr/testify/assert"
+	"gitlab.com/cameron_w20/serverless-mapreduce"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -62,7 +63,7 @@ func createTestStorage(tb testing.TB) func(tb testing.TB) {
 }
 
 func TestStartMapReduce(t *testing.T) {
-	teardown, subscription := setupTest(t, "mapreduce-splitter-0")
+	teardown, subscription := serverless_mapreduce.SetupTest(t, "mapreduce-splitter-0")
 	defer teardown(t)
 	teardown2 := createTestStorage(t)
 	defer teardown2(t)

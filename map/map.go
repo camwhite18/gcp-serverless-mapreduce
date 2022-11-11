@@ -1,4 +1,4 @@
-package serverless_mapreduce
+package _map
 
 import (
 	"cloud.google.com/go/pubsub"
@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
 	"github.com/cloudevents/sdk-go/v2/event"
+	"gitlab.com/cameron_w20/serverless-mapreduce"
 	"hash/fnv"
 	"log"
 	"sort"
@@ -30,7 +31,7 @@ type WordData struct {
 }
 
 func mapper(ctx context.Context, e event.Event) error {
-	var msg MessagePublishedData
+	var msg serverless_mapreduce.MessagePublishedData
 	if err := e.DataAs(&msg); err != nil {
 		return fmt.Errorf("error getting data from event: %v", err)
 	}

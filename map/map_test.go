@@ -1,4 +1,4 @@
-package serverless_mapreduce
+package _map
 
 import (
 	"cloud.google.com/go/pubsub"
@@ -6,44 +6,54 @@ import (
 	"encoding/json"
 	"github.com/cloudevents/sdk-go/v2/event"
 	"github.com/stretchr/testify/assert"
+	"gitlab.com/cameron_w20/serverless-mapreduce"
 	"testing"
 	"time"
 )
 
-func TestSplitter(t *testing.T) {
+func TestMapper(t *testing.T) {
 	// Setup test
-	teardown, subscription := setupTest(t, "mapreduce-mapper-0")
+	teardown, subscription := serverless_mapreduce.SetupTest(t, "mapreduce-shuffler-2")
 	defer teardown(t)
 	// Given
 	// Create a message
-	inputData := "1. The quick brown fox jumps over the lazy dog"
-	message := MessagePublishedData{
-		Message: PubSubMessage{
-			Data:       []byte(inputData),
+	inputData := []string{"quick"}
+	mapperData := MapperData{
+		Text: inputData,
+	}
+	mapperDataBytes, err := json.Marshal(mapperData)
+	if err != nil {
+		t.Fatalf("Error marshalling mapper data: %v", err)
+	}
+	message := serverless_mapreduce.MessagePublishedData{
+		Message: serverless_mapreduce.PubSubMessage{
+			Data:       mapperDataBytes,
 			Attributes: map[string]string{"splitter": "0"},
 		},
 	}
 	// Create a CloudEvent to be sent to the mapper
 	e := event.New()
 	e.SetDataContentType("application/json")
-	err := e.SetData(e.DataContentType(), message)
+	err = e.SetData(e.DataContentType(), message)
 	if err != nil {
 		t.Fatalf("Error setting event data: %v", err)
 	}
 
-	expectedResult := MapperData{
-		Text: []string{"quick", "brown", "fox", "jumps", "over", "lazy", "dog"},
+	expectedResult := WordData{
+		SortedWord: "cikqu",
+		Word:       inputData[0],
 	}
 
 	// When
-	err = splitter(context.Background(), e)
+	err = mapper(context.Background(), e)
 
 	// Then
 	// Ensure there are no errors returned
 	assert.Nil(t, err)
 	// The subscription will listen forever unless given a context with a timeout
-	ctx, _ := context.WithTimeout(context.Background(), 1*time.Second)
-	var actualResult MapperData
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	var actualResult WordData
 	err = subscription.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
 		// Unmarshal the message data into the WordData struct
 		err := json.Unmarshal(msg.Data, &actualResult)
@@ -56,16 +66,4 @@ func TestSplitter(t *testing.T) {
 	assert.Equal(t, expectedResult, actualResult)
 	// Ensure there are no errors returned by the receiver
 	assert.Nil(t, err)
-}
-
-func TestProcessText(t *testing.T) {
-	// Given
-	inputText := []byte("1. The quick brown fox jumps over the lazy dog.")
-	expectedResult := []string{"quick", "brown", "fox", "jumps", "over", "lazy", "dog"}
-
-	// When
-	actualResult := processText(inputText)
-
-	// Then
-	assert.Equal(t, expectedResult, actualResult)
 }

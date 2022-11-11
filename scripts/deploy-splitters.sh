@@ -7,7 +7,7 @@ if ! [ -x "$(command -v gcloud)" ]; then
 fi
 
 # Create the topics and deploy the splitters
-num_splitters=10
+num_splitters=2
 for ((i=0;i<num_splitters;i++)) do
   echo "Creating topic mapreduce-splitter-$i"
   if (gcloud pubsub topics create mapreduce-splitter-"$i" \
@@ -23,7 +23,7 @@ for ((i=0;i<num_splitters;i++)) do
   		--gen2 \
   		--runtime=go116 \
   		--trigger-topic mapreduce-splitter-"$i" \
-  		--source=. \
+  		--source=./split \
   		--entry-point Splitter \
   		--region=europe-west2 \
       --project=serverless-mapreduce) ; then

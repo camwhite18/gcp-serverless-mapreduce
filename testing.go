@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func setupTest(tb testing.TB, topicID string) (func(tb testing.TB), *pubsub.Subscription) {
+func SetupTest(tb testing.TB, topicID string) (func(tb testing.TB), *pubsub.Subscription) {
 	// Setup test
 	// Modify the PUBSUB_EMULATOR_HOST environment variable to point to the pubsub emulator
 	existingVal := os.Getenv("PUBSUB_EMULATOR_HOST")

@@ -23,7 +23,7 @@ for ((i=0;i<num_shufflers;i++)) do
   		--gen2 \
   		--runtime=go116 \
   		--trigger-topic mapreduce-shuffler-"$i" \
-  		--source=. \
+  		--source=./shuffle \
   		--entry-point Shuffler \
   		--region=europe-west2 \
       --project=serverless-mapreduce) ; then

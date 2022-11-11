@@ -7,7 +7,7 @@ if ! [ -x "$(command -v gcloud)" ]; then
 fi
 
 # Create the topics and deploy the mappers
-num_mappers=10
+num_mappers=2
 for ((i=0;i<num_mappers;i++)) do
   echo "Creating topic mapreduce-mapper-$i"
   if (gcloud pubsub topics create mapreduce-mapper-"$i" \
@@ -23,7 +23,7 @@ for ((i=0;i<num_mappers;i++)) do
   		--gen2 \
   		--runtime=go116 \
   		--trigger-topic mapreduce-mapper-"$i" \
-  		--source=. \
+  		--source=./map \
   		--entry-point Mapper \
   		--region=europe-west2 \
       --project=serverless-mapreduce) ; then
