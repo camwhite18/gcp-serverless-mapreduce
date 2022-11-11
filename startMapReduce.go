@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-const NO_OF_MAPPER_INSTANCES = 5
+const NO_OF_MAPPER_INSTANCES = 2
 
 func init() {
 	functions.HTTP("StartMapreduce", startMapreduce)

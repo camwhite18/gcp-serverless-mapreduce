@@ -40,11 +40,11 @@ func splitter(ctx context.Context, e event.Event) error {
 		PublishTime: time.Now(),
 	})
 	// Get the result of the publish
-	id, err := result.Get(ctx)
+	_, err = result.Get(ctx)
 	if err != nil {
 		log.Printf("Error publishing message to topic %s: %v", topic, err)
 	}
-	log.Printf("Published a message to topic mapreduce-splitter-%s; msg ID: %v", msg.Message.Attributes["splitter"], id)
+	log.Printf("Published a message to topic mapreduce-mapper-%s; content: %v", msg.Message.Attributes["splitter"], processText(msg.Message.Data))
 	return nil
 }
 

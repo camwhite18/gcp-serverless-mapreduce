@@ -30,9 +30,13 @@ type WordData struct {
 }
 
 func mapper(ctx context.Context, e event.Event) error {
-	var msg MapperData
+	var msg MessagePublishedData
 	if err := e.DataAs(&msg); err != nil {
 		return fmt.Errorf("error getting data from event: %v", err)
+	}
+	text := MapperData{}
+	if err := json.Unmarshal(msg.Message.Data, &text); err != nil {
+		return fmt.Errorf("error unmarshalling message: %v", err)
 	}
 	client, err := pubsub.NewClient(ctx, "serverless-mapreduce")
 	if err != nil {
@@ -40,7 +44,7 @@ func mapper(ctx context.Context, e event.Event) error {
 	}
 	defer client.Close()
 	var wg sync.WaitGroup
-	for _, word := range msg.Text {
+	for _, word := range text.Text {
 		wg.Add(1)
 		go sendToReducer(ctx, &wg, client, word)
 	}
@@ -73,6 +77,7 @@ func sendToReducer(ctx context.Context, wg *sync.WaitGroup, client *pubsub.Clien
 	if err != nil {
 		log.Printf("Error sending to reducer: %v", err)
 	}
+	log.Printf("Sent %s : %s to shuffler %s", sortedWord, word, reducerNum)
 	wg.Done()
 }
 

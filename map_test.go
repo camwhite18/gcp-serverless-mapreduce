@@ -17,11 +17,23 @@ func TestMapper(t *testing.T) {
 	// Given
 	// Create a message
 	inputData := []string{"quick"}
-	message := MapperData{Text: inputData}
+	mapperData := MapperData{
+		Text: inputData,
+	}
+	mapperDataBytes, err := json.Marshal(mapperData)
+	if err != nil {
+		t.Fatalf("Error marshalling mapper data: %v", err)
+	}
+	message := MessagePublishedData{
+		Message: PubSubMessage{
+			Data:       mapperDataBytes,
+			Attributes: map[string]string{"splitter": "0"},
+		},
+	}
 	// Create a CloudEvent to be sent to the mapper
 	e := event.New()
 	e.SetDataContentType("application/json")
-	err := e.SetData(e.DataContentType(), message)
+	err = e.SetData(e.DataContentType(), message)
 	if err != nil {
 		t.Fatalf("Error setting event data: %v", err)
 	}
@@ -38,7 +50,8 @@ func TestMapper(t *testing.T) {
 	// Ensure there are no errors returned
 	assert.Nil(t, err)
 	// The subscription will listen forever unless given a context with a timeout
-	ctx, _ := context.WithTimeout(context.Background(), 1*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
 	var actualResult WordData
 	err = subscription.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
 		// Unmarshal the message data into the WordData struct

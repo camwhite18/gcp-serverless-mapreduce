@@ -60,7 +60,7 @@ remove-mapper:
 #deploy-shuffler:
 #	./scripts/deploy-shufflers.sh
 deploy-shuffler:
-	@gcloud dataflow
+	@gcloud dat
 
 remove-shuffler:
 	./scripts/delete-shufflers.sh
@@ -71,7 +71,7 @@ deploy-reducer:
 remove-reducer:
 	./scripts/delete-reducers.sh
 
-deploy: create-input-bucket create-output-bucket deploy-splitter deploy-mapper deploy-shuffler deploy-reducer
+deploy: create-input-bucket create-output-bucket deploy-start-mapreduce deploy-splitter deploy-mapper deploy-shuffler deploy-reducer
 
 remove: remove-splitter remove-mapper remove-shuffler remove-reducer
 
