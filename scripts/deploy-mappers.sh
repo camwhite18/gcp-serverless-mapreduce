@@ -23,7 +23,7 @@ for ((i=0;i<num_mappers;i++)) do
   		--gen2 \
   		--runtime=go116 \
   		--trigger-topic mapreduce-mapper-"$i" \
-  		--source=./map \
+  		--source=. \
   		--entry-point Mapper \
   		--region=europe-west2 \
       --project=serverless-mapreduce) ; then

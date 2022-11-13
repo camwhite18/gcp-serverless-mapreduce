@@ -1,11 +1,10 @@
-package start
+package serverless_mapreduce
 
 import (
 	"cloud.google.com/go/pubsub"
 	"cloud.google.com/go/storage"
 	"context"
 	"github.com/stretchr/testify/assert"
-	"gitlab.com/cameron_w20/serverless-mapreduce"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -63,7 +62,7 @@ func createTestStorage(tb testing.TB) func(tb testing.TB) {
 }
 
 func TestStartMapReduce(t *testing.T) {
-	teardown, subscription := serverless_mapreduce.SetupTest(t, "mapreduce-splitter-0")
+	teardown, subscription := SetupTest(t, "mapreduce-splitter-0")
 	defer teardown(t)
 	teardown2 := createTestStorage(t)
 	defer teardown2(t)
@@ -82,7 +81,8 @@ func TestStartMapReduce(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Equal(t, expectedResponse, rec.Body.String())
 	// The subscription will listen forever unless given a context with a timeout
-	ctx, _ := context.WithTimeout(context.Background(), 1*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
 	var actualResult []byte
 	err := subscription.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
 		// Ensure the message data matches the expected result

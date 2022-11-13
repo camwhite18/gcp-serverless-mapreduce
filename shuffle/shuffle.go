@@ -1,18 +1,32 @@
-package shuffle
+package main
 
 import (
 	"encoding/json"
-	"gitlab.com/cameron_w20/serverless-mapreduce"
-	"gitlab.com/cameron_w20/serverless-mapreduce/map"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"os"
 )
 
-var anagramMap = make(map[string][]string)
+var anagramMap = make(map[string]map[string][]string)
+
+type MessagePublishedData struct {
+	Message PubSubMessage
+}
+
+type PubSubMessage struct {
+	Data       []byte            `json:"data"`
+	Attributes map[string]string `json:"attributes"`
+}
+
+type WordData struct {
+	SortedWord string
+	Word       string
+}
 
 func shuffle(w http.ResponseWriter, r *http.Request) {
-	var msg serverless_mapreduce.MessagePublishedData
+	var msg MessagePublishedData
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Printf("Error reading body: %v", err)
@@ -24,18 +38,24 @@ func shuffle(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Bad request", http.StatusBadRequest)
 		return
 	}
+	// Get the mapreduce instance id
+	id := msg.Message.Attributes["instanceId"]
 	// Unmarshal the message data
-	wordData := _map.WordData{}
+	wordData := WordData{}
 	if err := json.Unmarshal(msg.Message.Data, &wordData); err != nil {
 		log.Printf("Error unmarshalling message data: %v", err)
 		http.Error(w, "Bad request", http.StatusBadRequest)
 		return
 	}
-	anagramMap[wordData.SortedWord] = append(anagramMap[wordData.SortedWord], wordData.Word)
+	anagramMap[id][wordData.SortedWord] = append(anagramMap[id][wordData.SortedWord], wordData.Word)
 	log.Printf("Anagram map: %v", anagramMap)
 }
 
 func main() {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
 	http.HandleFunc("/", shuffle)
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), nil))
 }

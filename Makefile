@@ -57,10 +57,8 @@ deploy-mapper:
 remove-mapper:
 	./scripts/delete-mappers.sh
 
-#deploy-shuffler:
-#	./scripts/deploy-shufflers.sh
 deploy-shuffler:
-	@gcloud dat
+	./scripts/deploy-shufflers.sh
 
 remove-shuffler:
 	./scripts/delete-shufflers.sh

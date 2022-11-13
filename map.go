@@ -1,4 +1,4 @@
-package _map
+package serverless_mapreduce
 
 import (
 	"cloud.google.com/go/pubsub"
@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
 	"github.com/cloudevents/sdk-go/v2/event"
-	"gitlab.com/cameron_w20/serverless-mapreduce"
 	"hash/fnv"
 	"log"
 	"sort"
@@ -21,17 +20,8 @@ func init() {
 	functions.CloudEvent("Mapper", mapper)
 }
 
-type MapperData struct {
-	Text []string `json:"text"`
-}
-
-type WordData struct {
-	SortedWord string
-	Word       string
-}
-
 func mapper(ctx context.Context, e event.Event) error {
-	var msg serverless_mapreduce.MessagePublishedData
+	var msg MessagePublishedData
 	if err := e.DataAs(&msg); err != nil {
 		return fmt.Errorf("error getting data from event: %v", err)
 	}
@@ -47,13 +37,13 @@ func mapper(ctx context.Context, e event.Event) error {
 	var wg sync.WaitGroup
 	for _, word := range text.Text {
 		wg.Add(1)
-		go sendToReducer(ctx, &wg, client, word)
+		go sendToReducer(ctx, &wg, msg.Message.Attributes["instanceId"], client, word)
 	}
 	wg.Wait()
 	return nil
 }
 
-func sendToReducer(ctx context.Context, wg *sync.WaitGroup, client *pubsub.Client, word string) {
+func sendToReducer(ctx context.Context, wg *sync.WaitGroup, instanceId string, client *pubsub.Client, word string) {
 	// sort string into alphabetical order
 	splitWord := strings.Split(word, "")
 	sort.Strings(splitWord)
@@ -72,11 +62,12 @@ func sendToReducer(ctx context.Context, wg *sync.WaitGroup, client *pubsub.Clien
 	topic := client.Topic("mapreduce-shuffler-" + reducerNum)
 	result := topic.Publish(ctx, &pubsub.Message{
 		Data:        wordDataJson,
+		Attributes:  map[string]string{"instanceId": instanceId},
 		PublishTime: time.Now(),
 	})
 	_, err = result.Get(ctx)
 	if err != nil {
-		log.Printf("Error sending to reducer: %v", err)
+		log.Printf("Error sending to shuffler: %v", err)
 	}
 	log.Printf("Sent %s : %s to shuffler %s", sortedWord, word, reducerNum)
 	wg.Done()
@@ -86,5 +77,5 @@ func findReducerNum(s string) string {
 	h := fnv.New32a()
 	h.Write([]byte(s))
 	hashedString := h.Sum32()
-	return strconv.Itoa(int(hashedString % 10))
+	return strconv.Itoa(int(hashedString % 1))
 }

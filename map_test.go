@@ -1,4 +1,4 @@
-package _map
+package serverless_mapreduce
 
 import (
 	"cloud.google.com/go/pubsub"
@@ -6,14 +6,13 @@ import (
 	"encoding/json"
 	"github.com/cloudevents/sdk-go/v2/event"
 	"github.com/stretchr/testify/assert"
-	"gitlab.com/cameron_w20/serverless-mapreduce"
 	"testing"
 	"time"
 )
 
 func TestMapper(t *testing.T) {
 	// Setup test
-	teardown, subscription := serverless_mapreduce.SetupTest(t, "mapreduce-shuffler-2")
+	teardown, subscription := SetupTest(t, "mapreduce-shuffler-2")
 	defer teardown(t)
 	// Given
 	// Create a message
@@ -25,8 +24,8 @@ func TestMapper(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error marshalling mapper data: %v", err)
 	}
-	message := serverless_mapreduce.MessagePublishedData{
-		Message: serverless_mapreduce.PubSubMessage{
+	message := MessagePublishedData{
+		Message: PubSubMessage{
 			Data:       mapperDataBytes,
 			Attributes: map[string]string{"splitter": "0"},
 		},

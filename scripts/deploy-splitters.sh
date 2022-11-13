@@ -23,7 +23,7 @@ for ((i=0;i<num_splitters;i++)) do
   		--gen2 \
   		--runtime=go116 \
   		--trigger-topic mapreduce-splitter-"$i" \
-  		--source=./split \
+  		--source=. \
   		--entry-point Splitter \
   		--region=europe-west2 \
       --project=serverless-mapreduce) ; then

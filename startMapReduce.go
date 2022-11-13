@@ -1,4 +1,4 @@
-package start
+package serverless_mapreduce
 
 import (
 	"cloud.google.com/go/pubsub"
@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
+	"github.com/google/uuid"
 	"google.golang.org/api/iterator"
 	"io"
 	"log"
@@ -28,6 +29,8 @@ type Response struct {
 }
 
 func startMapreduce(w http.ResponseWriter, r *http.Request) {
+	// Create mapreduce instance uuid
+	instanceId := uuid.New().String()
 	// Read bucket name from request
 	bucketName := r.URL.Query().Get("bucket")
 	// Create a new storage client
@@ -72,13 +75,13 @@ func startMapreduce(w http.ResponseWriter, r *http.Request) {
 	var wg sync.WaitGroup
 	for i, files := range splitFiles {
 		wg.Add(1)
-		go sendToSplitter(ctxBackground, &wg, bucketName, files, i)
+		go sendToSplitter(ctxBackground, &wg, instanceId, bucketName, files, i)
 	}
 	wg.Wait()
 	writeResponse(w, http.StatusOK, "MapReduce started successfully")
 }
 
-func sendToSplitter(ctx context.Context, wg *sync.WaitGroup, bucketName string, files []string, instanceNo int) {
+func sendToSplitter(ctx context.Context, wg *sync.WaitGroup, instanceId string, bucketName string, files []string, instanceNo int) {
 	defer wg.Done()
 	// Create a new pubsub client
 	client, err := pubsub.NewClient(ctx, "serverless-mapreduce")
@@ -98,7 +101,7 @@ func sendToSplitter(ctx context.Context, wg *sync.WaitGroup, bucketName string, 
 		// Send the contents to the splitter instance
 		result := topic.Publish(ctx, &pubsub.Message{
 			Data:        removeBookHeaderAndFooter(data),
-			Attributes:  map[string]string{"splitter": splitterNo},
+			Attributes:  map[string]string{"instanceId": instanceId},
 			PublishTime: time.Now(),
 		})
 		// Get the result of the publish
