@@ -37,13 +37,14 @@ func mapper(ctx context.Context, e event.Event) error {
 	var wg sync.WaitGroup
 	for _, word := range text.Text {
 		wg.Add(1)
-		go sendToReducer(ctx, &wg, msg.Message.Attributes["instanceId"], client, word)
+		go sendToReducer(ctx, &wg, msg.Message.Attributes, client, word)
 	}
 	wg.Wait()
+	// Send finished message to shuffler
 	return nil
 }
 
-func sendToReducer(ctx context.Context, wg *sync.WaitGroup, instanceId string, client *pubsub.Client, word string) {
+func sendToReducer(ctx context.Context, wg *sync.WaitGroup, msgAttributes map[string]string, client *pubsub.Client, word string) {
 	// sort string into alphabetical order
 	splitWord := strings.Split(word, "")
 	sort.Strings(splitWord)
@@ -62,7 +63,7 @@ func sendToReducer(ctx context.Context, wg *sync.WaitGroup, instanceId string, c
 	topic := client.Topic("mapreduce-shuffler-" + reducerNum)
 	result := topic.Publish(ctx, &pubsub.Message{
 		Data:        wordDataJson,
-		Attributes:  map[string]string{"instanceId": instanceId},
+		Attributes:  msgAttributes,
 		PublishTime: time.Now(),
 	})
 	_, err = result.Get(ctx)

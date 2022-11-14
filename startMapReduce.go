@@ -101,7 +101,7 @@ func sendToSplitter(ctx context.Context, wg *sync.WaitGroup, instanceId string, 
 		// Send the contents to the splitter instance
 		result := topic.Publish(ctx, &pubsub.Message{
 			Data:        removeBookHeaderAndFooter(data),
-			Attributes:  map[string]string{"instanceId": instanceId},
+			Attributes:  map[string]string{"instanceId": instanceId, "splitter": splitterNo},
 			PublishTime: time.Now(),
 		})
 		// Get the result of the publish

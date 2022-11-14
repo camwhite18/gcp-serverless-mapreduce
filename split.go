@@ -37,7 +37,7 @@ func splitter(ctx context.Context, e event.Event) error {
 	topic := client.Topic("mapreduce-mapper-" + msg.Message.Attributes["splitter"])
 	result := topic.Publish(ctx, &pubsub.Message{
 		Data:        mapperDataMarshalled,
-		Attributes:  map[string]string{"instanceId": msg.Message.Attributes["instanceId"]},
+		Attributes:  msg.Message.Attributes,
 		PublishTime: time.Now(),
 	})
 	// Get the result of the publish
