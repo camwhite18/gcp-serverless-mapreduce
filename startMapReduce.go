@@ -8,16 +8,15 @@ import (
 	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
 	"github.com/google/uuid"
 	"google.golang.org/api/iterator"
-	"io"
 	"log"
 	"net/http"
-	"regexp"
 	"strconv"
 	"sync"
 	"time"
 )
 
-const NO_OF_MAPPER_INSTANCES = 2
+const NO_OF_MAPPER_INSTANCES = 5
+const NO_OF_REDUCER_INSTANCES = 5
 
 func init() {
 	functions.HTTP("StartMapreduce", startMapreduce)
@@ -33,6 +32,22 @@ func startMapreduce(w http.ResponseWriter, r *http.Request) {
 	instanceId := uuid.New().String()
 	// Read bucket name from request
 	bucketName := r.URL.Query().Get("bucket")
+	// Read number of mapper instances from request
+	noOfMapperInstances := r.URL.Query().Get("mappers")
+	if noOfMapperInstances == "" {
+		noOfMapperInstances = strconv.Itoa(NO_OF_MAPPER_INSTANCES)
+	} else if noOfMapperInstances < "1" || noOfMapperInstances > "10" {
+		writeResponse(w, http.StatusBadRequest, "Number of mapper instances must be between 1 and 10 (inclusive)")
+		return
+	}
+	// Read number of reducer instances from request
+	noOfReducerInstances := r.URL.Query().Get("reducers")
+	if noOfReducerInstances == "" {
+		noOfReducerInstances = strconv.Itoa(NO_OF_REDUCER_INSTANCES)
+	} else if noOfReducerInstances < "1" || noOfReducerInstances > "10" {
+		writeResponse(w, http.StatusBadRequest, "Number of reducer instances must be between 1 and 10 (inclusive)")
+		return
+	}
 	// Create a new storage client
 	ctx := context.Background()
 	client, err := storage.NewClient(ctx)
@@ -66,88 +81,63 @@ func startMapreduce(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Split the slice into NO_OF_MAPPER_INSTANCES slices
-	splitFiles := make([][]string, NO_OF_MAPPER_INSTANCES)
+	noOfMapperInstancesInt, err := strconv.Atoi(noOfMapperInstances)
+	splitFiles := make([][]string, noOfMapperInstancesInt)
+	if err != nil {
+		writeResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	for i, file := range files {
-		splitFiles[i%NO_OF_MAPPER_INSTANCES] = append(splitFiles[i%NO_OF_MAPPER_INSTANCES], file)
+		splitFiles[i%noOfMapperInstancesInt] = append(splitFiles[i%noOfMapperInstancesInt], file)
 	}
 	// Send the slices to the splitter instances
 	ctxBackground := context.Background()
 	var wg sync.WaitGroup
 	for i, files := range splitFiles {
 		wg.Add(1)
-		go sendToSplitter(ctxBackground, &wg, instanceId, bucketName, files, i)
+		go sendToSplitter(ctxBackground, &wg, instanceId, bucketName, files, i, noOfMapperInstances, noOfReducerInstances)
 	}
 	wg.Wait()
 	writeResponse(w, http.StatusOK, "MapReduce started successfully")
 }
 
-func sendToSplitter(ctx context.Context, wg *sync.WaitGroup, instanceId string, bucketName string, files []string, instanceNo int) {
+func sendToSplitter(ctx context.Context, wg *sync.WaitGroup, instanceId string, bucketName string, files []string,
+	instanceNo int, noOfMappers string, noOfReducers string) {
 	defer wg.Done()
 	// Create a new pubsub client
 	client, err := pubsub.NewClient(ctx, "serverless-mapreduce")
 	if err != nil {
 		log.Printf("Error creating client: %v", err)
+		return
 	}
 	defer client.Close()
 	// Set the topic the client will publish to
-	splitterNo := strconv.Itoa(instanceNo)
-	topic := client.Topic("mapreduce-splitter-" + splitterNo)
-	for _, file := range files {
-		// Read the contents of the file
-		data, err := readFileFromBucket(ctx, bucketName, file)
-		if err != nil {
-			log.Printf("Error reading file %s from bucket %s: %v", file, bucketName, err)
-		}
-		// Send the contents to the splitter instance
-		result := topic.Publish(ctx, &pubsub.Message{
-			Data:        removeBookHeaderAndFooter(data),
-			Attributes:  map[string]string{"instanceId": instanceId, "splitter": splitterNo},
-			PublishTime: time.Now(),
-		})
-		// Get the result of the publish
-		id, err := result.Get(ctx)
-		if err != nil {
-			log.Printf("Error publishing message to topic %s: %v", topic, err)
-		}
-		log.Printf("Published a message to topic mapreduce-splitter-%s; msg ID: %v", strconv.Itoa(instanceNo), id)
+	mapperNo := strconv.Itoa(instanceNo)
+	topic := client.Topic("mapreduce-splitter-" + mapperNo)
+	// Create the struct to be sent to the splitter
+	splitterData := SplitterData{
+		BucketName: bucketName,
+		FileNames:  files,
 	}
-}
-
-func readFileFromBucket(ctx context.Context, bucketName, objectName string) ([]byte, error) {
-	client, err := storage.NewClient(ctx)
+	// Marshal the data to an array of bytes
+	splitterDataBytes, err := json.Marshal(splitterData)
 	if err != nil {
-		return nil, err
+		log.Printf("Error marshalling splitter data: %v", err)
+		return
 	}
-	rc, err := client.Bucket(bucketName).Object(objectName).NewReader(ctx)
+	// Publish the message to the topic
+	result := topic.Publish(ctx, &pubsub.Message{
+		Data: splitterDataBytes,
+		Attributes: map[string]string{"instanceId": instanceId, "noOfMappers": noOfMappers,
+			"noOfReducers": noOfReducers, "mapper": mapperNo},
+	})
+	// Get the result of the publish
+	id, err := result.Get(ctx)
 	if err != nil {
-		return nil, err
+		log.Printf("Error publishing message to topic %s: %v", topic, err)
+		return
 	}
-	defer rc.Close()
-	data, err := io.ReadAll(rc)
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
-}
-
-func removeBookHeaderAndFooter(data []byte) []byte {
-	// remove book header
-	re := regexp.MustCompile(`\*\*\*.*START OF TH(E|IS) PROJECT GUTENBERG EBOOK.*\*\*\*`)
-	// find the index of the occurrence of the header
-	index := re.FindStringIndex(string(data))
-	// remove the header
-	if index != nil {
-		data = data[index[1]+1:]
-	}
-	// remove book footer
-	re = regexp.MustCompile(`\*\*\*.*END OF TH(E|IS) PROJECT GUTENBERG EBOOK.*\*\*\*`)
-	// find the index of the occurrence of the footer
-	index = re.FindStringIndex(string(data))
-	// remove the footer
-	if index != nil {
-		data = data[:index[0]]
-	}
-	return data
+	log.Printf("Published a message to topic mapreduce-splitter-%s; msg ID: %v", strconv.Itoa(instanceNo), id)
 }
 
 func writeResponse(w http.ResponseWriter, code int, message string) {

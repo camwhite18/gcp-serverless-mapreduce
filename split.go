@@ -2,14 +2,17 @@ package serverless_mapreduce
 
 import (
 	"cloud.google.com/go/pubsub"
+	"cloud.google.com/go/storage"
 	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
 	"github.com/cloudevents/sdk-go/v2/event"
+	"io"
 	"log"
+	"regexp"
 	"strings"
-	"time"
+	"sync"
 )
 
 func init() {
@@ -21,76 +24,87 @@ func splitter(ctx context.Context, e event.Event) error {
 	if err := e.DataAs(&msg); err != nil {
 		return fmt.Errorf("error getting data from event: %v", err)
 	}
-	mapperData := MapperData{
-		Text: processText(msg.Message.Data),
+	// Unmarshal message data
+	splitterData := SplitterData{}
+	if err := json.Unmarshal(msg.Message.Data, &splitterData); err != nil {
+		return fmt.Errorf("error unmarshalling message: %v", err)
 	}
-	mapperDataMarshalled, err := json.Marshal(mapperData)
-	if err != nil {
-		return fmt.Errorf("error marshalling mapper data: %v", err)
-	}
+	// Loop through all files in the bucket, then send each file to the mapper
 	client, err := pubsub.NewClient(ctx, "serverless-mapreduce")
 	if err != nil {
-		log.Printf("Error creating client: %v", err)
+		return fmt.Errorf("error creating pubsub client: %v", err)
 	}
 	defer client.Close()
-	// Set the topic the client will publish to
-	topic := client.Topic("mapreduce-mapper-" + msg.Message.Attributes["splitter"])
-	result := topic.Publish(ctx, &pubsub.Message{
-		Data:        mapperDataMarshalled,
-		Attributes:  msg.Message.Attributes,
-		PublishTime: time.Now(),
-	})
-	// Get the result of the publish
-	_, err = result.Get(ctx)
-	if err != nil {
-		log.Printf("Error publishing message to topic %s: %v", topic, err)
+	var wg sync.WaitGroup
+	for _, file := range splitterData.FileNames {
+		wg.Add(1)
+		go func(file string) {
+			defer wg.Done()
+			data, err := readFileFromBucket(ctx, splitterData.BucketName, file)
+			if err != nil {
+				log.Printf("error reading file from bucket: %v", err)
+				return
+			}
+			data = removeBookHeaderAndFooter(data)
+			// Split the file into a list of words
+			splitText := strings.Fields(string(data))
+			// Send file to mapper
+			mapperData := MapperData{
+				Text: splitText,
+			}
+			data, err = json.Marshal(mapperData)
+			if err != nil {
+				log.Printf("error marshalling mapper data: %v", err)
+				return
+			}
+			topic := client.Topic("mapreduce-mapper-" + msg.Message.Attributes["mapper"])
+			result := topic.Publish(ctx, &pubsub.Message{
+				Data:       data,
+				Attributes: msg.Message.Attributes,
+			})
+			_, err = result.Get(ctx)
+			if err != nil {
+				log.Printf("error publishing message to topic: %v", err)
+			}
+		}(file)
 	}
-	log.Printf("Published a message to topic mapreduce-mapper-%s; content: %v", msg.Message.Attributes["splitter"], processText(msg.Message.Data))
+	wg.Wait()
 	return nil
 }
 
-func processText(data []byte) []string {
-	// Create a map containing all the stopwords as keys since Golang doesn't have sets
-	stopwords := map[string]struct{}{"'tis": {}, "'twas": {}, "a": {}, "able": {}, "about": {}, "across": {},
-		"after": {}, "ain't": {}, "all": {}, "almost": {}, "also": {}, "am": {}, "among": {}, "an": {}, "and": {},
-		"any": {}, "are": {}, "aren't": {}, "as": {}, "at": {}, "be": {}, "because": {}, "been": {}, "but": {},
-		"by": {}, "can": {}, "can't": {}, "cannot": {}, "could": {}, "could've": {}, "couldn't": {}, "dear": {},
-		"did": {}, "didn't": {}, "do": {}, "does": {}, "doesn't": {}, "don't": {}, "either": {}, "else": {}, "ever": {},
-		"every": {}, "for": {}, "from": {}, "get": {}, "got": {}, "had": {}, "has": {}, "hasn't": {}, "have": {},
-		"he": {}, "he'd": {}, "he'll": {}, "he's": {}, "her": {}, "hers": {}, "him": {}, "his": {}, "how": {},
-		"how'd": {}, "how'll": {}, "how's": {}, "however": {}, "i": {}, "i'd": {}, "i'll": {}, "i'm": {}, "i've": {},
-		"if": {}, "in": {}, "into": {}, "is": {}, "isn't": {}, "it": {}, "it's": {}, "its": {}, "just": {}, "least": {},
-		"let": {}, "like": {}, "likely": {}, "may": {}, "me": {}, "might": {}, "might've": {}, "mightn't": {},
-		"most": {}, "must": {}, "must've": {}, "mustn't": {}, "my": {}, "neither": {}, "no": {}, "nor": {}, "not": {},
-		"of": {}, "off": {}, "often": {}, "on": {}, "only": {}, "or": {}, "other": {}, "our": {}, "own": {},
-		"rather": {}, "said": {}, "say": {}, "says": {}, "shan't": {}, "she": {}, "she'd": {}, "she'll": {},
-		"she's": {}, "should": {}, "should've": {}, "shouldn't": {}, "since": {}, "so": {}, "some": {}, "than": {},
-		"that": {}, "that'll": {}, "that's": {}, "the": {}, "their": {}, "them": {}, "then": {}, "there": {},
-		"there's": {}, "these": {}, "they": {}, "they'd": {}, "they'll": {}, "they're": {}, "they've": {}, "this": {},
-		"tis": {}, "to": {}, "too": {}, "twas": {}, "us": {}, "wants": {}, "was": {}, "wasn't": {}, "we": {},
-		"we'd": {}, "we'll": {}, "we're": {}, "were": {}, "weren't": {}, "what": {}, "what'd": {}, "what's": {},
-		"when": {}, "when'd": {}, "when'll": {}, "when's": {}, "where": {}, "where'd": {}, "where'll": {},
-		"where's": {}, "which": {}, "while": {}, "who": {}, "who'd": {}, "who'll": {}, "who's": {}, "whom": {},
-		"why": {}, "why'd": {}, "why'll": {}, "why's": {}, "will": {}, "with": {}, "won't": {}, "would": {},
-		"would've": {}, "wouldn't": {}, "yet": {}, "you": {}, "you'd": {}, "you'll": {}, "you're": {}, "you've": {},
-		"your": {},
+func readFileFromBucket(ctx context.Context, bucketName, objectName string) ([]byte, error) {
+	client, err := storage.NewClient(ctx)
+	if err != nil {
+		return nil, err
 	}
-	text := string(data)
-	words := strings.Fields(text)
-	processedText := make([]string, 0)
-	for i := 0; i < len(words); i++ {
-		// Convert to lowercase
-		words[i] = strings.ToLower(words[i])
-		// Remove stopwords and words containing numbers
-		if _, ok := stopwords[words[i]]; ok || strings.ContainsAny(words[i], "0123456789") {
-			words[i] = ""
-		}
-		// Remove punctuation
-		words[i] = strings.Trim(words[i], ".,;:!?\" ")
-		// Remove empty strings
-		if words[i] != "" {
-			processedText = append(processedText, words[i])
-		}
+	rc, err := client.Bucket(bucketName).Object(objectName).NewReader(ctx)
+	if err != nil {
+		return nil, err
 	}
-	return processedText
+	defer rc.Close()
+	data, err := io.ReadAll(rc)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+func removeBookHeaderAndFooter(data []byte) []byte {
+	// remove book header
+	re := regexp.MustCompile(`\*\*\*.*START OF TH(E|IS) PROJECT GUTENBERG EBOOK.*\*\*\*`)
+	// find the index of the occurrence of the header
+	index := re.FindStringIndex(string(data))
+	// remove the header
+	if index != nil {
+		data = data[index[1]+1:]
+	}
+	// remove book footer
+	re = regexp.MustCompile(`\*\*\*.*END OF TH(E|IS) PROJECT GUTENBERG EBOOK.*\*\*\*`)
+	// find the index of the occurrence of the footer
+	index = re.FindStringIndex(string(data))
+	// remove the footer
+	if index != nil {
+		data = data[:index[0]]
+	}
+	return data
 }
