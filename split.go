@@ -4,12 +4,14 @@ import (
 	"cloud.google.com/go/pubsub"
 	"cloud.google.com/go/storage"
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
 	"github.com/cloudevents/sdk-go/v2/event"
 	"io"
 	"log"
+	"math"
 	"regexp"
 	"strings"
 	"sync"
@@ -35,41 +37,59 @@ func splitter(ctx context.Context, e event.Event) error {
 		return fmt.Errorf("error creating pubsub client: %v", err)
 	}
 	defer client.Close()
+	topic := client.Topic("mapreduce-mapper-" + msg.Message.Attributes["mapper"])
+	topic.PublishSettings.ByteThreshold = MAX_MESSAGE_SIZE_BYTES
+	defer topic.Stop()
 	var wg sync.WaitGroup
 	for _, file := range splitterData.FileNames {
 		wg.Add(1)
-		go func(file string) {
-			defer wg.Done()
-			data, err := readFileFromBucket(ctx, splitterData.BucketName, file)
-			if err != nil {
-				log.Printf("error reading file from bucket: %v", err)
-				return
-			}
-			data = removeBookHeaderAndFooter(data)
-			// Split the file into a list of words
-			splitText := strings.Fields(string(data))
-			// Send file to mapper
-			mapperData := MapperData{
-				Text: splitText,
-			}
-			data, err = json.Marshal(mapperData)
-			if err != nil {
-				log.Printf("error marshalling mapper data: %v", err)
-				return
-			}
-			topic := client.Topic("mapreduce-mapper-" + msg.Message.Attributes["mapper"])
-			result := topic.Publish(ctx, &pubsub.Message{
-				Data:       data,
-				Attributes: msg.Message.Attributes,
-			})
-			_, err = result.Get(ctx)
-			if err != nil {
-				log.Printf("error publishing message to topic: %v", err)
-			}
-		}(file)
+		go sendToMapper(ctx, &wg, msg.Message.Attributes, topic, splitterData.BucketName, file, msg.Message.Data)
 	}
 	wg.Wait()
 	return nil
+}
+
+func sendToMapper(ctx context.Context, wg *sync.WaitGroup, attributes map[string]string, topic *pubsub.Topic,
+	bucketName string, file string, data []byte) {
+	defer wg.Done()
+	data, err := readFileFromBucket(ctx, bucketName, file)
+	if err != nil {
+		log.Printf("error reading file from bucket: %v", err)
+		return
+	}
+	data = removeBookHeaderAndFooter(data)
+	// Split the file into a list of words
+	splitText := strings.Fields(string(data))
+	numOfPartitions := 1
+	if size := binary.Size(splitText); size > MAX_MESSAGE_SIZE_BYTES {
+		numOfPartitions = int(math.Ceil(float64(size) / MAX_MESSAGE_SIZE_BYTES))
+	}
+	// Split the list of words into partitions of less than MAX_MESSAGE_SIZE_BYTES bytes
+	partitionSize := int(math.Ceil(float64(len(splitText)) / float64(numOfPartitions)))
+	for i := 0; i < len(splitText); i += partitionSize {
+		end := i + partitionSize
+		if end > len(splitText) {
+			end = len(splitText)
+		}
+		partition := splitText[i:end]
+		// Send partition to mapper
+		mapperData := MapperData{
+			Text: partition,
+		}
+		data, err = json.Marshal(mapperData)
+		if err != nil {
+			log.Printf("error marshalling mapper data: %v", err)
+			return
+		}
+		result := topic.Publish(ctx, &pubsub.Message{
+			Data:       data,
+			Attributes: attributes,
+		})
+		_, err = result.Get(ctx)
+		if err != nil {
+			log.Printf("error publishing message to topic: %v", err)
+		}
+	}
 }
 
 func readFileFromBucket(ctx context.Context, bucketName, objectName string) ([]byte, error) {

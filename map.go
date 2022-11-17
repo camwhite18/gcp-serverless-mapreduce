@@ -34,41 +34,56 @@ func mapper(ctx context.Context, e event.Event) error {
 		return fmt.Errorf("error creating pubsub client: %v", err)
 	}
 	defer client.Close()
-	wordsMap := sortWords(text.Text, msg.Message.Attributes["noOfReducers"])
+	//wordsMap := sortWords(text.Text, msg.Message.Attributes["noOfReducers"])
+	noOfReducers, err := strconv.Atoi(msg.Message.Attributes["noOfReducers"])
+	if err != nil {
+		log.Printf("error converting noOfReducers to int: %v", err)
+		return err
+	}
 	var wg sync.WaitGroup
-	for reducerNum, words := range wordsMap {
+	//for reducerNum, words := range wordsMap {
+	//	wg.Add(1)
+	//	go sendToShuffler(ctx, &wg, msg.Message.Attributes, client, reducerNum, words)
+	//}
+	topics := make([]*pubsub.Topic, noOfReducers)
+	for i := 0; i < noOfReducers; i++ {
+		topic := client.Topic("mapreduce-shuffler-" + strconv.Itoa(i))
+		topic.PublishSettings.ByteThreshold = MAX_MESSAGE_SIZE_BYTES
+		topics[i] = topic
+	}
+	for _, word := range text.Text {
 		wg.Add(1)
-		go sendToShuffler(ctx, &wg, msg.Message.Attributes, client, reducerNum, words)
+		go sendToShuffler(ctx, &wg, msg.Message.Attributes, client, topics, word)
 	}
 	wg.Wait()
 	// Send "finished" message to shuffler
 	return nil
 }
 
-func sortWords(words []string, noOfReducers string) map[string][]WordData {
-	wordsMap := make(map[string][]WordData)
-	for _, word := range words {
-		// Check if word needs to be removed
-		if word = processText(word); word == "" {
-			continue
-		}
-		// sort string into alphabetical order
-		splitWord := strings.Split(word, "")
-		sort.Strings(splitWord)
-		sortedWord := strings.Join(splitWord, "")
-		wordData := WordData{
-			SortedWord: sortedWord,
-			Word:       word,
-		}
-		reducerNum, err := findReducerNum(sortedWord, noOfReducers)
-		if err != nil {
-			log.Printf("Error finding reducer number: %v", err)
-			continue
-		}
-		wordsMap[reducerNum] = append(wordsMap[reducerNum], wordData)
-	}
-	return wordsMap
-}
+//func sortWords(words []string, noOfReducers string) map[string][]WordData {
+//	wordsMap := make(map[string][]WordData)
+//	for _, word := range words {
+//		// Check if word needs to be removed
+//		if word = processText(word); word == "" {
+//			continue
+//		}
+//		// sort string into alphabetical order
+//		splitWord := strings.Split(word, "")
+//		sort.Strings(splitWord)
+//		sortedWord := strings.Join(splitWord, "")
+//		wordData := WordData{
+//			SortedWord: sortedWord,
+//			Word:       word,
+//		}
+//		reducerNum, err := findReducerNum(sortedWord, noOfReducers)
+//		if err != nil {
+//			log.Printf("Error finding reducer number: %v", err)
+//			continue
+//		}
+//		wordsMap[reducerNum] = append(wordsMap[reducerNum], wordData)
+//	}
+//	return wordsMap
+//}
 
 func findReducerNum(s string, noOfReducers string) (string, error) {
 	h := fnv.New32a()
@@ -81,12 +96,53 @@ func findReducerNum(s string, noOfReducers string) (string, error) {
 	return strconv.Itoa(int(hashedString % uint32(noOfReducersInt))), nil
 }
 
+//func sendToShuffler(ctx context.Context, wg *sync.WaitGroup, msgAttributes map[string]string, client *pubsub.Client,
+//	reducerNum string, words []WordData) {
+//	defer wg.Done()
+//	topic := client.Topic("mapreduce-shuffler-" + reducerNum)
+//	defer topic.Stop()
+//	shufflerData := ShufflerData{
+//		Data: words,
+//	}
+//	// Marshal shufflerData into JSON to be sent to reducer
+//	data, err := json.Marshal(shufflerData)
+//	if err != nil {
+//		log.Printf("Error marshalling data: %v", err)
+//		return
+//	}
+//	// Send to shuffler
+//	result := topic.Publish(ctx, &pubsub.Message{
+//		Data:        data,
+//		Attributes:  msgAttributes,
+//		PublishTime: time.Now(),
+//	})
+//	_, err = result.Get(ctx)
+//	if err != nil {
+//		log.Printf("Error publishing message: %v", err)
+//		return
+//	}
+//	log.Printf("Published message %s to topic: %v", shufflerData.Data, topic)
+//}
+
 func sendToShuffler(ctx context.Context, wg *sync.WaitGroup, msgAttributes map[string]string, client *pubsub.Client,
-	reducerNum string, words []WordData) {
+	topics []*pubsub.Topic, word string) {
 	defer wg.Done()
-	topic := client.Topic("mapreduce-shuffler-" + reducerNum)
-	shufflerData := ShufflerData{
-		Data: words,
+	processedWord := processText(word)
+	if processedWord == "" {
+		return
+	}
+	reducerNum, err := findReducerNum(processedWord, msgAttributes["noOfReducers"])
+	if err != nil {
+		log.Printf("Error finding reducer number: %v", err)
+		return
+	}
+	// sort string into alphabetical order
+	splitWord := strings.Split(processedWord, "")
+	sort.Strings(splitWord)
+	sortedWord := strings.Join(splitWord, "")
+	shufflerData := WordData{
+		SortedWord: sortedWord,
+		Word:       processedWord,
 	}
 	// Marshal shufflerData into JSON to be sent to reducer
 	data, err := json.Marshal(shufflerData)
@@ -95,7 +151,12 @@ func sendToShuffler(ctx context.Context, wg *sync.WaitGroup, msgAttributes map[s
 		return
 	}
 	// Send to shuffler
-	result := topic.Publish(ctx, &pubsub.Message{
+	reducerNumInt, err := strconv.Atoi(reducerNum)
+	if err != nil {
+		log.Printf("Error converting reducerNum to int: %v", err)
+		return
+	}
+	result := topics[reducerNumInt].Publish(ctx, &pubsub.Message{
 		Data:        data,
 		Attributes:  msgAttributes,
 		PublishTime: time.Now(),
@@ -105,8 +166,6 @@ func sendToShuffler(ctx context.Context, wg *sync.WaitGroup, msgAttributes map[s
 		log.Printf("Error publishing message: %v", err)
 		return
 	}
-	log.Printf("Published message to topic: %v", topic)
-	topic.Stop()
 }
 
 func processText(word string) string {

@@ -15,8 +15,8 @@ import (
 	"time"
 )
 
-const NO_OF_MAPPER_INSTANCES = 5
-const NO_OF_REDUCER_INSTANCES = 5
+const DEFAULT_NO_OF_MAPPER_INSTANCES = 5
+const DEFAULT_NO_OF_REDUCER_INSTANCES = 5
 
 func init() {
 	functions.HTTP("StartMapreduce", startMapreduce)
@@ -30,24 +30,8 @@ type Response struct {
 func startMapreduce(w http.ResponseWriter, r *http.Request) {
 	// Create mapreduce instance uuid
 	instanceId := uuid.New().String()
-	// Read bucket name from request
-	bucketName := r.URL.Query().Get("bucket")
-	// Read number of mapper instances from request
-	noOfMapperInstances := r.URL.Query().Get("mappers")
-	if noOfMapperInstances == "" {
-		noOfMapperInstances = strconv.Itoa(NO_OF_MAPPER_INSTANCES)
-	} else if noOfMapperInstances < "1" || noOfMapperInstances > "10" {
-		writeResponse(w, http.StatusBadRequest, "Number of mapper instances must be between 1 and 10 (inclusive)")
-		return
-	}
-	// Read number of reducer instances from request
-	noOfReducerInstances := r.URL.Query().Get("reducers")
-	if noOfReducerInstances == "" {
-		noOfReducerInstances = strconv.Itoa(NO_OF_REDUCER_INSTANCES)
-	} else if noOfReducerInstances < "1" || noOfReducerInstances > "10" {
-		writeResponse(w, http.StatusBadRequest, "Number of reducer instances must be between 1 and 10 (inclusive)")
-		return
-	}
+	// Get the query parameters
+	bucketName, noOfMapperInstances, noOfMapperInstancesInt, noOfReducerInstances := getQueryParams(w, r)
 	// Create a new storage client
 	ctx := context.Background()
 	client, err := storage.NewClient(ctx)
@@ -80,13 +64,8 @@ func startMapreduce(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Split the slice into NO_OF_MAPPER_INSTANCES slices
-	noOfMapperInstancesInt, err := strconv.Atoi(noOfMapperInstances)
+	// Split the slice into DEFAULT_NO_OF_MAPPER_INSTANCES slices
 	splitFiles := make([][]string, noOfMapperInstancesInt)
-	if err != nil {
-		writeResponse(w, http.StatusInternalServerError, err.Error())
-		return
-	}
 	for i, file := range files {
 		splitFiles[i%noOfMapperInstancesInt] = append(splitFiles[i%noOfMapperInstancesInt], file)
 	}
@@ -99,6 +78,39 @@ func startMapreduce(w http.ResponseWriter, r *http.Request) {
 	}
 	wg.Wait()
 	writeResponse(w, http.StatusOK, "MapReduce started successfully")
+}
+
+func getQueryParams(w http.ResponseWriter, r *http.Request) (bucketName string, noOfMapperInstances string,
+	noOfMapperInstancesInt int, noOfReducerInstances string) {
+	// Read bucket name from request
+	bucketName = r.URL.Query().Get("bucket")
+	// Read number of mapper instances from request
+	noOfMapperInstances = r.URL.Query().Get("mappers")
+	noOfMapperInstancesInt, err := strconv.Atoi(noOfMapperInstances)
+	if err != nil && noOfMapperInstances != "" {
+		writeResponse(w, http.StatusBadRequest, "Invalid number of mapper instances")
+		return
+	}
+	if noOfMapperInstances == "" {
+		noOfMapperInstances = strconv.Itoa(DEFAULT_NO_OF_MAPPER_INSTANCES)
+	} else if noOfMapperInstancesInt < 1 || noOfMapperInstancesInt > 10 {
+		writeResponse(w, http.StatusBadRequest, "Number of mapper instances must be between 1 and 10 (inclusive)")
+		return
+	}
+	// Read number of reducer instances from request
+	noOfReducerInstances = r.URL.Query().Get("reducers")
+	noOfReducerInstancesInt, err := strconv.Atoi(noOfReducerInstances)
+	if err != nil && noOfReducerInstances != "" {
+		writeResponse(w, http.StatusBadRequest, "Invalid number of reducer instances")
+		return
+	}
+	if noOfReducerInstances == "" {
+		noOfReducerInstances = strconv.Itoa(DEFAULT_NO_OF_REDUCER_INSTANCES)
+	} else if noOfReducerInstancesInt < 1 || noOfReducerInstancesInt > 10 {
+		writeResponse(w, http.StatusBadRequest, "Number of reducer instances must be between 1 and 10 (inclusive)")
+		return
+	}
+	return bucketName, noOfMapperInstances, noOfMapperInstancesInt, noOfReducerInstances
 }
 
 func sendToSplitter(ctx context.Context, wg *sync.WaitGroup, instanceId string, bucketName string, files []string,

@@ -1,5 +1,7 @@
 package serverless_mapreduce
 
+const MAX_MESSAGE_SIZE_BYTES = 8000
+
 type MessagePublishedData struct {
 	Message PubSubMessage
 }
@@ -10,7 +12,7 @@ type PubSubMessage struct {
 }
 
 type ShufflerData struct {
-	Data []WordData `json:"data"`
+	//Data []WordData `json:"data"`
 }
 
 type WordData struct {

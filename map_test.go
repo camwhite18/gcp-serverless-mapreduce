@@ -16,7 +16,7 @@ func TestMapper(t *testing.T) {
 	defer teardown(t)
 	// Given
 	// Create a message
-	inputData := []string{"The", "quick", "brown", "fox", "jumps", "over", "the", "lazy", "dog."}
+	inputData := []string{"quick"}
 	mapperData := MapperData{
 		Text: inputData,
 	}
@@ -38,38 +38,39 @@ func TestMapper(t *testing.T) {
 		t.Fatalf("Error setting event data: %v", err)
 	}
 
-	expectedResult := ShufflerData{
-		Data: []WordData{
-			{
-				SortedWord: "cikqu",
-				Word:       "quick",
-			},
-			{
-				SortedWord: "bnorw",
-				Word:       "brown",
-			},
-			{
-				SortedWord: "fox",
-				Word:       "fox",
-			},
-			{
-				SortedWord: "jmpsu",
-				Word:       "jumps",
-			},
-			{
-				SortedWord: "eorv",
-				Word:       "over",
-			},
-			{
-				SortedWord: "alyz",
-				Word:       "lazy",
-			},
-			{
-				SortedWord: "dgo",
-				Word:       "dog",
-			},
-		},
-	}
+	expectedResult := WordData{SortedWord: "cikqu", Word: "quick"}
+	//expectedResult := ShufflerData{
+	//Data: []WordData{
+	//	{
+	//		SortedWord: "cikqu",
+	//		Word:       "quick",
+	//	},
+	//	{
+	//		SortedWord: "bnorw",
+	//		Word:       "brown",
+	//	},
+	//	{
+	//		SortedWord: "fox",
+	//		Word:       "fox",
+	//	},
+	//	{
+	//		SortedWord: "jmpsu",
+	//		Word:       "jumps",
+	//	},
+	//	{
+	//		SortedWord: "eorv",
+	//		Word:       "over",
+	//	},
+	//	{
+	//		SortedWord: "alyz",
+	//		Word:       "lazy",
+	//	},
+	//	{
+	//		SortedWord: "dgo",
+	//		Word:       "dog",
+	//	},
+	//},
+	//}
 
 	// When
 	err = mapper(context.Background(), e)
@@ -80,7 +81,7 @@ func TestMapper(t *testing.T) {
 	// The subscription will listen forever unless given a context with a timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	var actualResult ShufflerData
+	var actualResult WordData
 	err = subscription.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
 		// Unmarshal the message data into the WordData struct
 		err := json.Unmarshal(msg.Data, &actualResult)
