@@ -7,7 +7,7 @@ if ! [ -x "$(command -v gcloud)" ]; then
 fi
 
 # Create the topics and deploy the splitters
-num_splitters=2
+num_splitters=1
 for ((i=0;i<num_splitters;i++)) do
   echo "Creating topic mapreduce-splitter-$i"
   if (gcloud pubsub topics create mapreduce-splitter-"$i" \

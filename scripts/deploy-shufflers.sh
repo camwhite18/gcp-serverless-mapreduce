@@ -25,6 +25,9 @@ for ((i=0;i<num_shufflers;i++)) do
       --image=gcr.io/serverless-mapreduce/shuffler:latest \
       --region=europe-west2 \
       --project=serverless-mapreduce \
+      --memory=1Gi \
+      --vpc-connector=mapreduce-connector \
+      --set-env-vars=REDIS_HOST=10.252.71.131,REDIS_PORT=6379 \
       --no-allow-unauthenticated)
 
   serviceUrl=$(echo "$serviceUrl"  | grep -Eo "https://[a-z0-9\.\-]*")

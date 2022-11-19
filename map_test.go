@@ -39,38 +39,6 @@ func TestMapper(t *testing.T) {
 	}
 
 	expectedResult := WordData{SortedWord: "cikqu", Word: "quick"}
-	//expectedResult := ShufflerData{
-	//Data: []WordData{
-	//	{
-	//		SortedWord: "cikqu",
-	//		Word:       "quick",
-	//	},
-	//	{
-	//		SortedWord: "bnorw",
-	//		Word:       "brown",
-	//	},
-	//	{
-	//		SortedWord: "fox",
-	//		Word:       "fox",
-	//	},
-	//	{
-	//		SortedWord: "jmpsu",
-	//		Word:       "jumps",
-	//	},
-	//	{
-	//		SortedWord: "eorv",
-	//		Word:       "over",
-	//	},
-	//	{
-	//		SortedWord: "alyz",
-	//		Word:       "lazy",
-	//	},
-	//	{
-	//		SortedWord: "dgo",
-	//		Word:       "dog",
-	//	},
-	//},
-	//}
 
 	// When
 	err = mapper(context.Background(), e)

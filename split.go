@@ -39,19 +39,21 @@ func splitter(ctx context.Context, e event.Event) error {
 	defer client.Close()
 	topic := client.Topic("mapreduce-mapper-" + msg.Message.Attributes["mapper"])
 	topic.PublishSettings.ByteThreshold = MAX_MESSAGE_SIZE_BYTES
+	topic.PublishSettings.CountThreshold = MAX_MESSAGE_COUNT
+	topic.PublishSettings.DelayThreshold = MAX_MESSAGE_DELAY
 	defer topic.Stop()
 	var wg sync.WaitGroup
 	for _, file := range splitterData.FileNames {
-		wg.Add(1)
-		go sendToMapper(ctx, &wg, msg.Message.Attributes, topic, splitterData.BucketName, file, msg.Message.Data)
+		//wg.Add(1)
+		sendToMapper(ctx, &wg, msg.Message.Attributes, topic, splitterData.BucketName, file, msg.Message.Data)
 	}
-	wg.Wait()
+	//wg.Wait()
 	return nil
 }
 
 func sendToMapper(ctx context.Context, wg *sync.WaitGroup, attributes map[string]string, topic *pubsub.Topic,
 	bucketName string, file string, data []byte) {
-	defer wg.Done()
+	//defer wg.Done()
 	data, err := readFileFromBucket(ctx, bucketName, file)
 	if err != nil {
 		log.Printf("error reading file from bucket: %v", err)
@@ -61,8 +63,15 @@ func sendToMapper(ctx context.Context, wg *sync.WaitGroup, attributes map[string
 	// Split the file into a list of words
 	splitText := strings.Fields(string(data))
 	numOfPartitions := 1
-	if size := binary.Size(splitText); size > MAX_MESSAGE_SIZE_BYTES {
+	log.Printf("splitText length: %v", len(splitText))
+	// Convert to byte array and calculate the number of partitions
+	byteArray := make([]byte, 0)
+	for _, s := range splitText {
+		byteArray = append(byteArray, []byte(s)...)
+	}
+	if size := binary.Size(byteArray); size > MAX_MESSAGE_SIZE_BYTES {
 		numOfPartitions = int(math.Ceil(float64(size) / MAX_MESSAGE_SIZE_BYTES))
+		log.Printf("Size of data is %d bytes, so splitting into %d partitions", size, numOfPartitions)
 	}
 	// Split the list of words into partitions of less than MAX_MESSAGE_SIZE_BYTES bytes
 	partitionSize := int(math.Ceil(float64(len(splitText)) / float64(numOfPartitions)))

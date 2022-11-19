@@ -1,6 +1,10 @@
 package serverless_mapreduce
 
-const MAX_MESSAGE_SIZE_BYTES = 8000
+import "time"
+
+const MAX_MESSAGE_SIZE_BYTES = 1000000
+const MAX_MESSAGE_COUNT = 10000
+const MAX_MESSAGE_DELAY = 100 * time.Millisecond
 
 type MessagePublishedData struct {
 	Message PubSubMessage

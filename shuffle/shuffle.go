@@ -3,22 +3,19 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/gomodule/redigo/redis"
 	"io"
 	"log"
 	"net/http"
 	"os"
-	"sync"
 )
 
-type Maps struct {
-	mu              sync.Mutex
-	anagramMap      map[string]map[string][]string
-	finishedMappers map[string]map[string]bool
-}
-
-var anagramMap = make(map[string]map[string][]string)
+//var mu sync.Mutex
+//var anagramMap = make(map[string]map[string][]string)
 
 //var mapperFinishedMap = make(map[string]map[string]bool)
+
+var redisPool *redis.Pool
 
 type MessagePublishedData struct {
 	Message PubSubMessage
@@ -34,7 +31,7 @@ type WordData struct {
 	Word       string
 }
 
-func (m *Maps) shuffle(w http.ResponseWriter, r *http.Request) {
+func shuffle(w http.ResponseWriter, r *http.Request) {
 	var msg MessagePublishedData
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -48,7 +45,7 @@ func (m *Maps) shuffle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Get the mapreduce instance id
-	id := msg.Message.Attributes["instanceId"]
+	//id := msg.Message.Attributes["instanceId"]
 	// Check for finished tag from all mappers
 	// Then send the results to the reducer
 	// Unmarshal the message data
@@ -59,21 +56,59 @@ func (m *Maps) shuffle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Lock the mutex to prevent concurrent access to the map
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if _, ok := anagramMap[id]; !ok {
-		anagramMap[id] = make(map[string][]string)
+	//mu.Lock()
+	//defer mu.Unlock()
+	//if _, ok := anagramMap[id]; !ok {
+	//	anagramMap[id] = make(map[string][]string)
+	//}
+	//anagramMap[id][wordData.SortedWord] = append(anagramMap[id][wordData.SortedWord], wordData.Word)
+	//log.Printf("Anagram map: %v", anagramMap)
+	conn := redisPool.Get()
+	defer conn.Close()
+
+	li, err := conn.Do("GET", wordData.SortedWord)
+	if err != nil {
+		log.Printf("Error getting data from redis: %v", err)
+		return
 	}
-	anagramMap[id][wordData.SortedWord] = append(anagramMap[id][wordData.SortedWord], wordData.Word)
-	log.Printf("Anagram map: %v", anagramMap)
+	var words []string
+	if li == nil {
+		words = []string{wordData.Word}
+	} else {
+		err := json.Unmarshal(li.([]byte), &words)
+		if err != nil {
+			log.Printf("Error unmarshalling data from redis: %v", err)
+			return
+		}
+		words = append(words, wordData.Word)
+	}
+	liBytes, err := json.Marshal(words)
+	if err != nil {
+		log.Printf("Error marshalling data to redis: %v", err)
+		return
+	}
+	_, err = conn.Do("SET", wordData.SortedWord, liBytes)
+	if err != nil {
+		log.Printf("Error setting data in redis: %v", err)
+		return
+	}
 }
 
 func main() {
-	m := Maps{}
+	redisHost := os.Getenv("REDIS_HOST")
+	redisPort := os.Getenv("REDIS_PORT")
+	redisAddress := fmt.Sprintf("%s:%s", redisHost, redisPort)
+	const maxConnections = 10
+	redisPool = &redis.Pool{
+		MaxIdle: maxConnections,
+		Dial: func() (redis.Conn, error) {
+			return redis.Dial("tcp", redisAddress)
+		},
+	}
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
-	http.HandleFunc("/", m.shuffle)
+	http.HandleFunc("/", shuffle)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), nil))
 }
