@@ -15,17 +15,9 @@ type PubSubMessage struct {
 	Attributes map[string]string `json:"attributes"`
 }
 
-type ShufflerData struct {
-	//Data []WordData `json:"data"`
-}
-
 type WordData struct {
 	SortedWord string
 	Word       string
-}
-
-type MapperData struct {
-	Text []string `json:"text"`
 }
 
 type SplitterData struct {

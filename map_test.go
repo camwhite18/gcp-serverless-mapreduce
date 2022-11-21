@@ -17,16 +17,13 @@ func TestMapper(t *testing.T) {
 	// Given
 	// Create a message
 	inputData := []string{"quick", "brown", "fox", "quick"}
-	mapperData := MapperData{
-		Text: inputData,
-	}
-	mapperDataBytes, err := json.Marshal(mapperData)
+	inputDataBytes, err := json.Marshal(inputData)
 	if err != nil {
 		t.Fatalf("Error marshalling mapper data: %v", err)
 	}
 	message := MessagePublishedData{
 		Message: PubSubMessage{
-			Data:       mapperDataBytes,
+			Data:       inputDataBytes,
 			Attributes: map[string]string{"splitter": "0", "noOfReducers": "1"},
 		},
 	}

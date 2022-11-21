@@ -6,37 +6,66 @@ if ! [ -x "$(command -v gcloud)" ]; then
   exit 1
 fi
 
-docker build -t gcr.io/serverless-mapreduce/shuffler:latest -f shuffle/Dockerfile .
-docker push gcr.io/serverless-mapreduce/shuffler:latest
-# Create the topics and deploy the shufflers
+# Create VPC connector for serverless VPC access to Redis
+#if (gcloud compute networks vpc-access connectors create mapreduce-connector \
+#    --project=serverless-mapreduce \
+#    --network=default \
+#    --region=europe-west2 \
+#    --max-instances=3 \
+#    --range=10.8.0.0/28) ; then
+#  echo "Successfully created VPC connector"
+#else
+#  echo "Failed to create VPC connector"
+#  exit 1
+#fi
+
+# Create the topics, redis instances and deploy the mappers
 num_shufflers=1
 for ((i=0;i<num_shufflers;i++)) do
   echo "Creating topic mapreduce-shuffler-$i"
   if (gcloud pubsub topics create mapreduce-shuffler-"$i" \
-    --project=serverless-mapreduce) ; then
+      --project=serverless-mapreduce) ; then
     echo "Successfully created topic mapreduce-shuffler-$i"
   else
     echo "Failed to create topic mapreduce-shuffler-$i"
     exit 1
   fi
 
-  echo "Deploying shuffler $i"
-  serviceUrl=$(gcloud run deploy shuffler-"$i" \
-      --image=gcr.io/serverless-mapreduce/shuffler:latest \
-      --region=europe-west2 \
-      --project=serverless-mapreduce \
-      --memory=1Gi \
-      --vpc-connector=mapreduce-connector \
-      --set-env-vars=REDIS_HOST=10.252.71.131,REDIS_PORT=6379 \
-      --no-allow-unauthenticated)
+#  echo "Creating Redis instance mapreduce-shuffler-$i"
+#  if (gcloud redis instances create mapreduce-shuffler-"$i" \
+#      --tier=basic \
+#      --region=europe-west2 \
+#      --size=1 \
+#      --network=default) ; then
+#    echo "Successfully created Redis instance mapreduce-shuffler-$i"
+#  else
+#    echo "Failed to create Redis instance mapreduce-shuffler-$i"
+#    exit 1
+#  fi
 
-  serviceUrl=$(echo "$serviceUrl"  | grep -Eo "https://[a-z0-9\.\-]*")
-  echo "Creating subscription mapreduce-shuffler-$i-subscription"
-  echo "$serviceUrl"
-  gcloud pubsub subscriptions create mapreduce-shuffler-"$i"-subscription \
-    --topic=mapreduce-shuffler-"$i" \
-    --ack-deadline=600 \
-    --project=serverless-mapreduce \
-    --push-endpoint="$serviceUrl" \
-    --push-auth-service-account=mapreduce-pubsub@serverless-mapreduce.iam.gserviceaccount.com
+#  REDIS_HOST=$(gcloud redis instances describe mapreduce-shuffler-"$i" \
+#                --region=europe-west2 \
+#                --format="value(host)")
+#  REDIS_PORT=$(gcloud redis instances describe mapreduce-shuffler-"$i" \
+#                --region=europe-west2 \
+#                --format="value(port)")
+
+  echo "Deploying shuffler $i"
+  if (gcloud functions deploy shuffler-"$i" \
+  		--gen2 \
+  		--runtime=go116 \
+  		--trigger-topic mapreduce-shuffler-"$i" \
+  		--source=. \
+  		--entry-point Shuffler \
+  		--region=europe-west2 \
+  		--memory=512MB \
+      --project=serverless-mapreduce \
+#      --vpc-connector=projects/serverless-mapreduce/locations/europe-west2/connectors/mapreduce-connector \
+#      --set-env-vars=REDIS_HOST="$REDIS_HOST",REDIS_PORT="$REDIS_PORT"
+      ) ; then
+    echo "Successfully deployed shuffler $i"
+  else
+    echo "Failed to deploy shuffler $i"
+    exit 1
+  fi
 done

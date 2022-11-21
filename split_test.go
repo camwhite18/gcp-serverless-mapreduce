@@ -41,9 +41,7 @@ func TestSplitter(t *testing.T) {
 		t.Fatalf("Error setting event data: %v", err)
 	}
 
-	expectedResult := MapperData{
-		Text: []string{"The", "quick", "brown", "fox", "jumps", "over", "the", "lazy", "dog."},
-	}
+	expectedResult := []string{"The", "quick", "brown", "fox", "jumps", "over", "the", "lazy", "dog."}
 
 	// When
 	err = splitter(context.Background(), e)
@@ -54,7 +52,7 @@ func TestSplitter(t *testing.T) {
 	// The subscription will listen forever unless given a context with a timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	var actualResult MapperData
+	var actualResult []string
 	err = subscription.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
 		// Unmarshal the message data into the WordData struct
 		err := json.Unmarshal(msg.Data, &actualResult)

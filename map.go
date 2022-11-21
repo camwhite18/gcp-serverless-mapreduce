@@ -1,10 +1,7 @@
 package serverless_mapreduce
 
 import (
-	"cloud.google.com/go/pubsub"
 	"context"
-	"encoding/json"
-	"fmt"
 	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
 	"github.com/cloudevents/sdk-go/v2/event"
 	"hash/fnv"
@@ -13,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 )
 
 func init() {
@@ -21,29 +17,19 @@ func init() {
 }
 
 func mapper(ctx context.Context, e event.Event) error {
-	startTime := time.Now()
-	var msg MessagePublishedData
-	if err := e.DataAs(&msg); err != nil {
-		return fmt.Errorf("error getting data from event: %v", err)
-	}
-	text := MapperData{}
-	if err := json.Unmarshal(msg.Message.Data, &text); err != nil {
-		return fmt.Errorf("error unmarshalling message: %v", err)
-	}
-	client, err := pubsub.NewClient(ctx, "serverless-mapreduce")
+	var text []string
+	client, attributes, err := ReadPubSubMessage(ctx, e, &text)
 	if err != nil {
-		return fmt.Errorf("error creating pubsub client: %v", err)
+		return err
 	}
 	defer client.Close()
 	var wg sync.WaitGroup
-	reducerWordMap := makeWordMap(text.Text, msg.Message.Attributes["noOfReducers"])
+	reducerWordMap := makeWordMap(text, attributes["noOfReducers"])
 	for reducerNum, wordData := range reducerWordMap {
 		wg.Add(1)
-		go sendToShuffler(ctx, &wg, msg.Message.Attributes, reducerNum, wordData, client)
+		go SendPubSubMessage(ctx, &wg, client, "mapreduce-shuffler-"+reducerNum, wordData, attributes)
 	}
 	wg.Wait()
-	finishTime := time.Now()
-	log.Printf("Mapper took %v to run", finishTime.Sub(startTime))
 	return nil
 }
 
@@ -93,28 +79,6 @@ func partition(s string, noOfReducers string) (string, error) {
 		return "", err
 	}
 	return strconv.Itoa(int(hashedString % uint32(noOfReducersInt))), nil
-}
-
-func sendToShuffler(ctx context.Context, wg *sync.WaitGroup, attributes map[string]string, reducerNum string, wordData []WordData, client *pubsub.Client) {
-	defer wg.Done()
-	topic := client.Topic("mapreduce-shuffler-" + reducerNum)
-	topic.PublishSettings.ByteThreshold = MAX_MESSAGE_SIZE_BYTES
-	topic.PublishSettings.CountThreshold = MAX_MESSAGE_COUNT
-	topic.PublishSettings.DelayThreshold = MAX_MESSAGE_DELAY
-	data, err := json.Marshal(wordData)
-	if err != nil {
-		log.Printf("Error marshalling word data: %v", err)
-		return
-	}
-	result := topic.Publish(ctx, &pubsub.Message{
-		Data:        data,
-		Attributes:  attributes,
-		PublishTime: time.Now(),
-	})
-	_, err = result.Get(ctx)
-	if err != nil {
-		log.Printf("Error publishing message: %v", err)
-	}
 }
 
 func processText(word string) string {
