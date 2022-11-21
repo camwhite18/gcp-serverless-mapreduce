@@ -16,7 +16,7 @@ func TestMapper(t *testing.T) {
 	defer teardown(t)
 	// Given
 	// Create a message
-	inputData := []string{"quick"}
+	inputData := []string{"quick", "brown", "fox", "quick"}
 	mapperData := MapperData{
 		Text: inputData,
 	}
@@ -38,7 +38,12 @@ func TestMapper(t *testing.T) {
 		t.Fatalf("Error setting event data: %v", err)
 	}
 
-	expectedResult := WordData{SortedWord: "cikqu", Word: "quick"}
+	expectedResult := []WordData{
+		{Word: "quick", SortedWord: "cikqu"},
+		{Word: "brown", SortedWord: "bnorw"},
+		{Word: "fox", SortedWord: "fox"},
+		{Word: "quick", SortedWord: "cikqu"},
+	}
 
 	// When
 	err = mapper(context.Background(), e)
@@ -49,7 +54,7 @@ func TestMapper(t *testing.T) {
 	// The subscription will listen forever unless given a context with a timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	var actualResult WordData
+	var actualResult []WordData
 	err = subscription.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
 		// Unmarshal the message data into the WordData struct
 		err := json.Unmarshal(msg.Data, &actualResult)
@@ -59,7 +64,9 @@ func TestMapper(t *testing.T) {
 		msg.Ack()
 	})
 	// Ensure the message data matches the expected result
-	assert.Equal(t, expectedResult, actualResult)
+	for i := 0; i < len(expectedResult); i++ {
+		assert.Contains(t, actualResult, expectedResult[i])
+	}
 	// Ensure there are no errors returned by the receiver
 	assert.Nil(t, err)
 }
@@ -95,6 +102,29 @@ func TestProcessTextStopWord(t *testing.T) {
 
 	// When
 	actualResult := processText(inputText)
+
+	// Then
+	assert.Equal(t, expectedResult, actualResult)
+}
+
+func TestMakeWordMap(t *testing.T) {
+	// Given
+	inputText := []string{"quick", "brown", "fox", "quick"}
+	noOfReducers := "2"
+
+	expectedResult := map[string][]WordData{
+		"0": {
+			{Word: "quick", SortedWord: "cikqu"},
+			{Word: "fox", SortedWord: "fox"},
+			{Word: "quick", SortedWord: "cikqu"},
+		},
+		"1": {
+			{Word: "brown", SortedWord: "bnorw"},
+		},
+	}
+
+	// When
+	actualResult := makeWordMap(inputText, noOfReducers)
 
 	// Then
 	assert.Equal(t, expectedResult, actualResult)

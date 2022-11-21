@@ -21,6 +21,7 @@ func init() {
 }
 
 func mapper(ctx context.Context, e event.Event) error {
+	startTime := time.Now()
 	var msg MessagePublishedData
 	if err := e.DataAs(&msg); err != nil {
 		return fmt.Errorf("error getting data from event: %v", err)
@@ -34,26 +35,53 @@ func mapper(ctx context.Context, e event.Event) error {
 		return fmt.Errorf("error creating pubsub client: %v", err)
 	}
 	defer client.Close()
-	noOfReducers, err := strconv.Atoi(msg.Message.Attributes["noOfReducers"])
-	if err != nil {
-		log.Printf("error converting noOfReducers to int: %v", err)
-		return err
-	}
 	var wg sync.WaitGroup
-	topics := make([]*pubsub.Topic, noOfReducers)
-	for i := 0; i < noOfReducers; i++ {
-		topic := client.Topic("mapreduce-shuffler-" + strconv.Itoa(i))
-		topic.PublishSettings.ByteThreshold = MAX_MESSAGE_SIZE_BYTES
-		topic.PublishSettings.CountThreshold = MAX_MESSAGE_COUNT
-		topic.PublishSettings.DelayThreshold = MAX_MESSAGE_DELAY
-		topics[i] = topic
+	reducerWordMap := makeWordMap(text.Text, msg.Message.Attributes["noOfReducers"])
+	for reducerNum, wordData := range reducerWordMap {
+		wg.Add(1)
+		go sendToShuffler(ctx, &wg, msg.Message.Attributes, reducerNum, wordData, client)
 	}
-	for _, word := range text.Text {
-		//wg.Add(1)
-		sendToShuffler(ctx, &wg, msg.Message.Attributes, topics, word)
-	}
-	//wg.Wait()
+	wg.Wait()
+	finishTime := time.Now()
+	log.Printf("Mapper took %v to run", finishTime.Sub(startTime))
 	return nil
+}
+
+func makeWordMap(text []string, noOfReducers string) map[string][]WordData {
+	wordMap := make(map[string][]WordData)
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	for _, word := range text {
+		wg.Add(1)
+		word := word
+		go func() {
+			defer wg.Done()
+			processedWord := processText(word)
+			if processedWord == "" {
+				return
+			}
+			// sort string into alphabetical order
+			splitWord := strings.Split(processedWord, "")
+			sort.Strings(splitWord)
+			sortedWord := strings.Join(splitWord, "")
+			reducerNum, err := partition(sortedWord, noOfReducers)
+			if err != nil {
+				log.Printf("Error finding reducer number: %v", err)
+				return
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			if wordMap[reducerNum] == nil {
+				wordMap[reducerNum] = make([]WordData, 0)
+			}
+			wordMap[reducerNum] = append(wordMap[reducerNum], WordData{
+				SortedWord: sortedWord,
+				Word:       processedWord,
+			})
+		}()
+	}
+	wg.Wait()
+	return wordMap
 }
 
 func partition(s string, noOfReducers string) (string, error) {
@@ -67,47 +95,25 @@ func partition(s string, noOfReducers string) (string, error) {
 	return strconv.Itoa(int(hashedString % uint32(noOfReducersInt))), nil
 }
 
-func sendToShuffler(ctx context.Context, wg *sync.WaitGroup, msgAttributes map[string]string,
-	topics []*pubsub.Topic, word string) {
-	//defer wg.Done()
-	processedWord := processText(word)
-	if processedWord == "" {
-		return
-	}
-	// sort string into alphabetical order
-	splitWord := strings.Split(processedWord, "")
-	sort.Strings(splitWord)
-	sortedWord := strings.Join(splitWord, "")
-	shufflerData := WordData{
-		SortedWord: sortedWord,
-		Word:       processedWord,
-	}
-	reducerNum, err := partition(sortedWord, msgAttributes["noOfReducers"])
+func sendToShuffler(ctx context.Context, wg *sync.WaitGroup, attributes map[string]string, reducerNum string, wordData []WordData, client *pubsub.Client) {
+	defer wg.Done()
+	topic := client.Topic("mapreduce-shuffler-" + reducerNum)
+	topic.PublishSettings.ByteThreshold = MAX_MESSAGE_SIZE_BYTES
+	topic.PublishSettings.CountThreshold = MAX_MESSAGE_COUNT
+	topic.PublishSettings.DelayThreshold = MAX_MESSAGE_DELAY
+	data, err := json.Marshal(wordData)
 	if err != nil {
-		log.Printf("Error finding reducer number: %v", err)
+		log.Printf("Error marshalling word data: %v", err)
 		return
 	}
-	// Marshal shufflerData into JSON to be sent to reducer
-	data, err := json.Marshal(shufflerData)
-	if err != nil {
-		log.Printf("Error marshalling data: %v", err)
-		return
-	}
-	// Send to shuffler
-	reducerNumInt, err := strconv.Atoi(reducerNum)
-	if err != nil {
-		log.Printf("Error converting reducerNum to int: %v", err)
-		return
-	}
-	result := topics[reducerNumInt].Publish(ctx, &pubsub.Message{
+	result := topic.Publish(ctx, &pubsub.Message{
 		Data:        data,
-		Attributes:  msgAttributes,
+		Attributes:  attributes,
 		PublishTime: time.Now(),
 	})
 	_, err = result.Get(ctx)
 	if err != nil {
 		log.Printf("Error publishing message: %v", err)
-		return
 	}
 }
 
@@ -141,8 +147,8 @@ func processText(word string) string {
 	word = strings.ToLower(word)
 	// Remove punctuation
 	word = strings.Trim(word, ".,;:!?\" ")
-	// Remove the word if it is a stopword or contains numbers
-	if _, ok := stopwords[word]; ok || strings.ContainsAny(word, "0123456789") {
+	// Remove the word if it is a stopword or contains numbers or symbols
+	if _, ok := stopwords[word]; ok || strings.ContainsAny(word, "0123456789*+_&^%$#@!~`|}{[]\\:;\"'<>,.?/") {
 		return ""
 	}
 	return word
