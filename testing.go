@@ -5,6 +5,7 @@ import (
 	"cloud.google.com/go/storage"
 	"context"
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -72,7 +73,8 @@ func createTestStorage(tb testing.TB) func(tb testing.TB) {
 	bucket := client.Bucket(BUCKET_NAME)
 	createStorageCtx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
-	if err := bucket.Create(createStorageCtx, "serverless-mapreduce", nil); err != nil {
+	if err := bucket.Create(createStorageCtx, "serverless-mapreduce", nil); err != nil &&
+		!strings.Contains(err.Error(), "already own this bucket") {
 		tb.Fatalf("Error creating bucket: %v", err)
 	}
 	// Create a file in the bucket
