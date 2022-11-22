@@ -101,14 +101,13 @@ func TestShuffler(t *testing.T) {
 	conn := redisPool.Get()
 	defer conn.Close()
 
-	li, err := conn.Do("GET", wordDataSlice[0].SortedWord)
+	li, err := conn.Do("LRANGE", wordDataSlice[0].SortedWord, 0, -1)
 	if err != nil {
 		t.Fatalf("Error getting data from redis: %v", err)
 	}
 	var actualResult []string
-	err = json.Unmarshal(li.([]byte), &actualResult)
-	if err != nil {
-		t.Fatalf("Error marshalling data to redis: %v", err)
+	for _, v := range li.([]interface{}) {
+		actualResult = append(actualResult, string(v.([]byte)))
 	}
 	assert.Equal(t, expectedResult, actualResult)
 }

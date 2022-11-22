@@ -2,7 +2,6 @@ package serverless_mapreduce
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
 	"github.com/cloudevents/sdk-go/v2/event"
@@ -55,27 +54,9 @@ func shuffler(_ context.Context, e event.Event) error {
 	conn := redisPool.Get()
 	defer conn.Close()
 	for _, wordData := range wordDataSlice {
-		li, err := conn.Do("GET", wordData.SortedWord)
+		_, err := conn.Do("RPUSH", wordData.SortedWord, wordData.Word)
 		if err != nil {
 			return fmt.Errorf("error getting data from redis: %v", err)
-		}
-		var words []string
-		if li == nil {
-			words = []string{wordData.Word}
-		} else {
-			err := json.Unmarshal(li.([]byte), &words)
-			if err != nil {
-				return fmt.Errorf("rror unmarshalling data from redis: %v", err)
-			}
-			words = append(words, wordData.Word)
-		}
-		liBytes, err := json.Marshal(words)
-		if err != nil {
-			return fmt.Errorf("error marshalling data to redis: %v", err)
-		}
-		_, err = conn.Do("SET", wordData.SortedWord, liBytes)
-		if err != nil {
-			return fmt.Errorf("error setting data in redis: %v", err)
 		}
 	}
 	return nil
