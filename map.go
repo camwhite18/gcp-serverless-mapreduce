@@ -25,6 +25,7 @@ func mapper(ctx context.Context, e event.Event) error {
 	}
 	defer client.Close()
 	var wg sync.WaitGroup
+	// Send a slice of key value pairs to each reducer to prevent too many function invocations
 	reducerWordMap := makeWordMap(text, attributes["noOfReducers"])
 	// Create topic object for each reducer
 	var topics []*pubsub.Topic
@@ -66,7 +67,7 @@ func makeWordMap(text []string, noOfReducers string) map[string][]WordData {
 			splitWord := strings.Split(processedWord, "")
 			sort.Strings(splitWord)
 			sortedWord := strings.Join(splitWord, "")
-			reducerNum, err := partition(sortedWord, noOfReducers)
+			reducerNum, err := shuffle(sortedWord, noOfReducers)
 			if err != nil {
 				log.Printf("Error finding reducer number: %v", err)
 				return
@@ -86,9 +87,9 @@ func makeWordMap(text []string, noOfReducers string) map[string][]WordData {
 	return wordMap
 }
 
-// partition takes a word and returns the shuffler/reducer number it should be sent to by taking the modulus of the
-// hashed word with the number of reducers
-func partition(s string, noOfReducers string) (string, error) {
+// shuffle takes a word and returns the reducer number it should be sent to by taking the modulus of the
+// hashed word with the total number of reducers
+func shuffle(s string, noOfReducers string) (string, error) {
 	h := fnv.New32a()
 	h.Write([]byte(s))
 	hashedString := h.Sum32()
@@ -130,7 +131,7 @@ func processText(word string) string {
 	// Remove punctuation
 	word = strings.Trim(word, ".,;:!?\" ")
 	// Remove the word if it is a stopword or contains numbers or symbols
-	if _, ok := stopwords[word]; ok || strings.ContainsAny(word, "0123456789*+_&^%$#@!~`|}{[]\\:;\"'<>,.?/") {
+	if _, ok := stopwords[word]; ok || strings.ContainsAny(word, "0123456789*+-_&^%$#@!~`|}{[]\\:;\"'<>,.?/") {
 		return ""
 	}
 	return word
