@@ -1,6 +1,7 @@
 package serverless_mapreduce
 
 import (
+	"cloud.google.com/go/pubsub"
 	"context"
 	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
 	"github.com/cloudevents/sdk-go/v2/event"
@@ -25,9 +26,24 @@ func mapper(ctx context.Context, e event.Event) error {
 	defer client.Close()
 	var wg sync.WaitGroup
 	reducerWordMap := makeWordMap(text, attributes["noOfReducers"])
+	// Create topics object for each reducer
+	var topics []*pubsub.Topic
+	for reducerNum := range reducerWordMap {
+		topics = append(topics, client.Topic("mapreduce-shuffler-"+reducerNum))
+	}
+	// Stop the topics when done
+	defer func() {
+		for _, topic := range topics {
+			topic.Stop()
+		}
+	}()
 	for reducerNum, wordData := range reducerWordMap {
 		wg.Add(1)
-		go SendPubSubMessage(ctx, &wg, client, "mapreduce-shuffler-"+reducerNum, wordData, attributes)
+		reducerNumInt, err := strconv.Atoi(reducerNum)
+		if err != nil {
+			return err
+		}
+		go SendPubSubMessage(ctx, &wg, topics[reducerNumInt], wordData, attributes)
 	}
 	wg.Wait()
 	return nil

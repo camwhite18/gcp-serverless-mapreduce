@@ -25,6 +25,7 @@ func splitter(ctx context.Context, e event.Event) error {
 	if err != nil {
 		return err
 	}
+	defer client.Close()
 	var wg sync.WaitGroup
 	for _, file := range splitterData.FileNames {
 		wg.Add(1)
@@ -45,10 +46,14 @@ func readFileAndSendToMapper(ctx context.Context, wg *sync.WaitGroup, attributes
 	// Split the file into a list of words
 	splitText := strings.Fields(string(data))
 	partitionedText := partitionFile(splitText, MAX_MESSAGE_SIZE_BYTES)
+	topic := client.Topic("mapreduce-mapper-" + attributes["mapper"])
+	defer topic.Stop()
+	var wg2 sync.WaitGroup
 	for _, partition := range partitionedText {
-		wg.Add(1)
-		go SendPubSubMessage(ctx, wg, client, "mapreduce-mapper-"+attributes["mapper"], partition, attributes)
+		wg2.Add(1)
+		go SendPubSubMessage(ctx, &wg2, topic, partition, attributes)
 	}
+	wg2.Wait()
 }
 
 func readFileFromBucket(ctx context.Context, bucketName, objectName string) ([]byte, error) {

@@ -25,12 +25,11 @@ func ReadPubSubMessage(ctx context.Context, e event.Event, data interface{}) (*p
 	return client, msg.Message.Attributes, nil
 }
 
-func SendPubSubMessage(ctx context.Context, wg *sync.WaitGroup, client *pubsub.Client, topicName string,
+func SendPubSubMessage(ctx context.Context, wg *sync.WaitGroup, topic *pubsub.Topic,
 	data interface{}, attributes map[string]string) {
 	if wg != nil {
 		defer wg.Done()
 	}
-	topic := client.Topic(topicName)
 	topic.PublishSettings.ByteThreshold = MAX_MESSAGE_SIZE_BYTES
 	topic.PublishSettings.CountThreshold = MAX_MESSAGE_COUNT
 	topic.PublishSettings.DelayThreshold = MAX_MESSAGE_DELAY
