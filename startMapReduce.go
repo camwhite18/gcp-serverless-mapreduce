@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
-	"github.com/google/uuid"
 	"google.golang.org/api/iterator"
 	"log"
 	"net/http"
@@ -28,8 +27,6 @@ type Response struct {
 }
 
 func startMapreduce(w http.ResponseWriter, r *http.Request) {
-	// Create mapreduce instance uuid
-	instanceId := uuid.New().String()
 	// Get the query parameters
 	bucketName, noOfMapperInstances, noOfMapperInstancesInt, noOfReducerInstances := getQueryParams(w, r)
 	files, err := readFileNamesInBucket(bucketName)
@@ -52,7 +49,7 @@ func startMapreduce(w http.ResponseWriter, r *http.Request) {
 	var wg sync.WaitGroup
 	for i, files := range splitFiles {
 		wg.Add(1)
-		go sendToSplitter(ctx, &wg, instanceId, bucketName, files, i, noOfMapperInstances, noOfReducerInstances)
+		go sendToSplitter(ctx, &wg, bucketName, files, i, noOfMapperInstances, noOfReducerInstances)
 	}
 	wg.Wait()
 	writeResponse(w, http.StatusOK, "MapReduce started successfully")
@@ -119,7 +116,7 @@ func readFileNamesInBucket(bucketName string) ([]string, error) {
 	return files, nil
 }
 
-func sendToSplitter(ctx context.Context, wg *sync.WaitGroup, instanceId string, bucketName string, files []string,
+func sendToSplitter(ctx context.Context, wg *sync.WaitGroup, bucketName string, files []string,
 	instanceNo int, noOfMappers string, noOfReducers string) {
 	defer wg.Done()
 	// Create a new pubsub client
@@ -137,8 +134,8 @@ func sendToSplitter(ctx context.Context, wg *sync.WaitGroup, instanceId string, 
 		BucketName: bucketName,
 		FileNames:  files,
 	}
-	attributes := map[string]string{"instanceId": instanceId, "noOfMappers": noOfMappers, "noOfReducers": noOfReducers,
-		"mapper": mapperNo}
+	attributes := map[string]string{"noOfMappers": noOfMappers, "noOfReducers": noOfReducers, "mapper": mapperNo,
+		"noOfBooks": strconv.Itoa(len(files))}
 	SendPubSubMessage(ctx, nil, topic, splitterData, attributes)
 }
 
