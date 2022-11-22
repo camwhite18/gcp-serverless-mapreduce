@@ -26,7 +26,7 @@ func mapper(ctx context.Context, e event.Event) error {
 	defer client.Close()
 	var wg sync.WaitGroup
 	reducerWordMap := makeWordMap(text, attributes["noOfReducers"])
-	// Create topics object for each reducer
+	// Create topic object for each reducer
 	var topics []*pubsub.Topic
 	for reducerNum := range reducerWordMap {
 		topics = append(topics, client.Topic("mapreduce-shuffler-"+reducerNum))
@@ -55,10 +55,10 @@ func makeWordMap(text []string, noOfReducers string) map[string][]WordData {
 	var wg sync.WaitGroup
 	for _, word := range text {
 		wg.Add(1)
-		word := word
+		w := word
 		go func() {
 			defer wg.Done()
-			processedWord := processText(word)
+			processedWord := processText(w)
 			if processedWord == "" {
 				return
 			}
@@ -86,6 +86,8 @@ func makeWordMap(text []string, noOfReducers string) map[string][]WordData {
 	return wordMap
 }
 
+// partition takes a word and returns the shuffler/reducer number it should be sent to by taking the modulus of the
+// hashed word with the number of reducers
 func partition(s string, noOfReducers string) (string, error) {
 	h := fnv.New32a()
 	h.Write([]byte(s))

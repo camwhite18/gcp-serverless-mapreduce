@@ -32,49 +32,27 @@ func startMapreduce(w http.ResponseWriter, r *http.Request) {
 	instanceId := uuid.New().String()
 	// Get the query parameters
 	bucketName, noOfMapperInstances, noOfMapperInstancesInt, noOfReducerInstances := getQueryParams(w, r)
-	// Create a new storage client
-	ctx := context.Background()
-	client, err := storage.NewClient(ctx)
+	files, err := readFileNamesInBucket(bucketName)
 	if err != nil {
 		writeResponse(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	defer client.Close()
-
-	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
-	defer cancel()
-	// Iterate over all objects in the bucket
-	objects := client.Bucket(bucketName).Objects(ctx, nil)
-	files := make([]string, 0)
-	for {
-		attributes, err := objects.Next()
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			writeResponse(w, http.StatusInternalServerError, err.Error())
-			return
-		}
-		// Add the file name to the list of files
-		files = append(files, attributes.Name)
-	}
-	// If there are no files in the bucket, return an error
+	// If there are no files in the bucket, write bad request response and return
 	if len(files) == 0 {
 		writeResponse(w, http.StatusBadRequest, "No files found in bucket")
 		return
 	}
-
-	// Split the slice into DEFAULT_NO_OF_MAPPER_INSTANCES slices
+	// Partition the slice into equal sized slices for each splitter
 	splitFiles := make([][]string, noOfMapperInstancesInt)
 	for i, file := range files {
 		splitFiles[i%noOfMapperInstancesInt] = append(splitFiles[i%noOfMapperInstancesInt], file)
 	}
 	// Send the slices to the splitter instances
-	ctxBackground := context.Background()
+	ctx := context.Background()
 	var wg sync.WaitGroup
 	for i, files := range splitFiles {
 		wg.Add(1)
-		go sendToSplitter(ctxBackground, &wg, instanceId, bucketName, files, i, noOfMapperInstances, noOfReducerInstances)
+		go sendToSplitter(ctx, &wg, instanceId, bucketName, files, i, noOfMapperInstances, noOfReducerInstances)
 	}
 	wg.Wait()
 	writeResponse(w, http.StatusOK, "MapReduce started successfully")
@@ -113,6 +91,34 @@ func getQueryParams(w http.ResponseWriter, r *http.Request) (bucketName string, 
 	return bucketName, noOfMapperInstances, noOfMapperInstancesInt, noOfReducerInstances
 }
 
+func readFileNamesInBucket(bucketName string) ([]string, error) {
+	// Create a new storage client
+	ctx := context.Background()
+	client, err := storage.NewClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer client.Close()
+
+	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
+	defer cancel()
+	// Iterate over all objects in the bucket
+	objects := client.Bucket(bucketName).Objects(ctx, nil)
+	files := make([]string, 0)
+	for {
+		attributes, err := objects.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		// Add the file name to the list of files
+		files = append(files, attributes.Name)
+	}
+	return files, nil
+}
+
 func sendToSplitter(ctx context.Context, wg *sync.WaitGroup, instanceId string, bucketName string, files []string,
 	instanceNo int, noOfMappers string, noOfReducers string) {
 	defer wg.Done()
@@ -131,25 +137,9 @@ func sendToSplitter(ctx context.Context, wg *sync.WaitGroup, instanceId string, 
 		BucketName: bucketName,
 		FileNames:  files,
 	}
-	// Marshal the data to an array of bytes
-	splitterDataBytes, err := json.Marshal(splitterData)
-	if err != nil {
-		log.Printf("Error marshalling splitter data: %v", err)
-		return
-	}
-	// Publish the message to the topic
-	result := topic.Publish(ctx, &pubsub.Message{
-		Data: splitterDataBytes,
-		Attributes: map[string]string{"instanceId": instanceId, "noOfMappers": noOfMappers,
-			"noOfReducers": noOfReducers, "mapper": mapperNo},
-	})
-	// Get the result of the publish
-	id, err := result.Get(ctx)
-	if err != nil {
-		log.Printf("Error publishing message to topic %s: %v", topic, err)
-		return
-	}
-	log.Printf("Published a message to topic mapreduce-splitter-%s; msg ID: %v", strconv.Itoa(instanceNo), id)
+	attributes := map[string]string{"instanceId": instanceId, "noOfMappers": noOfMappers, "noOfReducers": noOfReducers,
+		"mapper": mapperNo}
+	SendPubSubMessage(ctx, nil, topic, splitterData, attributes)
 }
 
 func writeResponse(w http.ResponseWriter, code int, message string) {
