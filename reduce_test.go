@@ -67,11 +67,8 @@ func TestReducer(t *testing.T) {
 	defer teardown(t)
 	teardownRedis := SetupRedisTest(t)
 	defer teardownRedis(t)
-	wordDataSlice := []WordData{
-		{Word: "quick", SortedWord: "cikqu"},
-		{Word: "brown", SortedWord: "bnorw"},
-		{Word: "fox", SortedWord: "fox"},
-		{Word: "quick", SortedWord: "cikqu"},
+	wordDataSlice := []CombinedWordData{
+		{SortedWord: "acer", Anagrams: []string{"care", "race"}},
 	}
 	// Create a message
 	wordDataBytes, err := json.Marshal(wordDataSlice)
@@ -93,7 +90,7 @@ func TestReducer(t *testing.T) {
 		t.Fatalf("Error setting event data: %v", err)
 	}
 
-	expectedResult := []string{"quick"}
+	expectedResult := []string{"care", "race"}
 
 	// When
 	startTime := time.Now()

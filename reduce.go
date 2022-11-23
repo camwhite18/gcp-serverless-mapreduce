@@ -46,18 +46,20 @@ func reducer(_ context.Context, e event.Event) error {
 		}
 	}
 
-	var wordDataSlice []WordData
+	var wordDataSlice []CombinedWordData
 	_, _, err := ReadPubSubMessage(context.Background(), e, &wordDataSlice)
 	if err != nil {
 		return fmt.Errorf("error reading pubsub message: %v", err)
 	}
 	conn := redisPool.Get()
 	defer conn.Close()
-	// Combine and reduce in one step by storing the data in a set in redis
+	// Store the data in a set in redis
 	for _, wordData := range wordDataSlice {
-		_, err := conn.Do("SADD", wordData.SortedWord, wordData.Word)
-		if err != nil {
-			log.Printf("error pushing value to set in redis: %v", err)
+		for _, word := range wordData.Anagrams {
+			_, err := conn.Do("SADD", wordData.SortedWord, word)
+			if err != nil {
+				log.Printf("error pushing value to set in redis: %v", err)
+			}
 		}
 	}
 	return nil
