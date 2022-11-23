@@ -22,6 +22,11 @@ type WordData struct {
 	Word       string
 }
 
+type CombinedWordData struct {
+	SortedWord string
+	Anagrams   []string
+}
+
 type SplitterData struct {
 	BucketName string `json:"bucketName"`
 	FileName   string `json:"fileName"`

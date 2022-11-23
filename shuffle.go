@@ -15,14 +15,14 @@ func init() {
 }
 
 func shuffler(ctx context.Context, e event.Event) error {
-	var text []WordData
-	client, _, err := ReadPubSubMessage(ctx, e, &text)
+	var wordData []CombinedWordData
+	client, _, err := ReadPubSubMessage(ctx, e, &wordData)
 	if err != nil {
 		return err
 	}
 	defer client.Close()
 	// Shuffle the words into a map of reducer number to a list of words
-	shuffledText := shuffle(text)
+	shuffledText := shuffle(wordData)
 	// Create topic object for each reducer
 	var topics []*pubsub.Topic
 	for i := 0; i < NO_OF_REDUCER_INSTANCES; i++ {
@@ -44,18 +44,18 @@ func shuffler(ctx context.Context, e event.Event) error {
 	return nil
 }
 
-func shuffle(keyValues []WordData) map[int][]WordData {
-	shuffledText := make(map[int][]WordData)
+func shuffle(wordData []CombinedWordData) map[int][]CombinedWordData {
+	shuffledText := make(map[int][]CombinedWordData)
 	var mu sync.Mutex
 	var wg sync.WaitGroup
-	for _, value := range keyValues {
+	for _, value := range wordData {
 		wg.Add(1)
-		go func(value WordData) {
+		go func(value CombinedWordData) {
 			defer wg.Done()
 			reducerNum := partition(value.SortedWord)
 			mu.Lock()
 			if shuffledText[reducerNum] == nil {
-				shuffledText[reducerNum] = make([]WordData, 0)
+				shuffledText[reducerNum] = make([]CombinedWordData, 0)
 			}
 			shuffledText[reducerNum] = append(shuffledText[reducerNum], value)
 			mu.Unlock()
