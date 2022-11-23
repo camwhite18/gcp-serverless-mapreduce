@@ -46,22 +46,28 @@ remove-start-mapreduce:
 	@gcloud functions delete start-mapreduce --region=$(GCP_REGION) --project=$(GCP_PROJECT) --gen2
 
 deploy-splitter:
-	./scripts/deploy-splitters.sh
+	./scripts/deploy-splitter.sh
 
 remove-splitter:
-	./scripts/delete-splitters.sh
+	./scripts/delete-splitter.sh
 
 deploy-mapper:
-	./scripts/deploy-mappers.sh
+	./scripts/deploy-mapper.sh
 
 remove-mapper:
-	./scripts/delete-mappers.sh
+	./scripts/delete-mapper.sh
+
+deploy-combine:
+	./scripts/deploy-combine.sh
+
+remove-combine:
+	./scripts/delete-combine.sh
 
 deploy-shuffler:
-	./scripts/deploy-shufflers.sh
+	./scripts/deploy-shuffler.sh
 
 remove-shuffler:
-	./scripts/delete-shufflers.sh
+	./scripts/delete-shuffler.sh
 
 deploy-reducer:
 	./scripts/deploy-reducers.sh
@@ -69,9 +75,9 @@ deploy-reducer:
 remove-reducer:
 	./scripts/delete-reducers.sh
 
-deploy: create-input-bucket create-output-bucket deploy-start-mapreduce deploy-splitter deploy-mapper deploy-shuffler deploy-reducer
+deploy: create-input-bucket create-output-bucket deploy-start-mapreduce deploy-splitter deploy-mapper  deploy-combine deploy-shuffler deploy-reducer
 
-remove: remove-splitter remove-mapper remove-shuffler remove-reducer
+remove: remove-splitter remove-mapper remove-combine remove-shuffler remove-reducer
 
 create-pubsub-emulator:
 	@docker-compose up -d pubsub-emulator
