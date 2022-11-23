@@ -2,6 +2,8 @@ package serverless_mapreduce
 
 import "time"
 
+const NO_OF_REDUCER_INSTANCES = 5
+
 const MAX_MESSAGE_SIZE_BYTES = 1000000
 const MAX_MESSAGE_COUNT = 1000
 const MAX_MESSAGE_DELAY = 100 * time.Millisecond
@@ -21,6 +23,6 @@ type WordData struct {
 }
 
 type SplitterData struct {
-	BucketName string   `json:"bucketName"`
-	FileNames  []string `json:"fileNames"`
+	BucketName string `json:"bucketName"`
+	FileName   string `json:"fileName"`
 }

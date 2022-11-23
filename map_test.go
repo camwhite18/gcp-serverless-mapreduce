@@ -12,7 +12,7 @@ import (
 
 func TestMapper(t *testing.T) {
 	// Setup test
-	teardown, subscription := SetupTest(t, "mapreduce-shuffler-0")
+	teardown, subscription := SetupTest(t, "mapreduce-shuffler")
 	defer teardown(t)
 	// Given
 	// Create a message
@@ -23,8 +23,7 @@ func TestMapper(t *testing.T) {
 	}
 	message := MessagePublishedData{
 		Message: PubSubMessage{
-			Data:       inputDataBytes,
-			Attributes: map[string]string{"splitter": "0", "noOfReducers": "1"},
+			Data: inputDataBytes,
 		},
 	}
 	// Create a CloudEvent to be sent to the mapper
@@ -74,7 +73,7 @@ func TestProcessText(t *testing.T) {
 	expectedResult := "teststring"
 
 	// When
-	actualResult := processText(inputText)
+	actualResult := preProcessWord(inputText)
 
 	// Then
 	assert.Equal(t, expectedResult, actualResult)
@@ -86,7 +85,7 @@ func TestProcessTextNumber(t *testing.T) {
 	expectedResult := ""
 
 	// When
-	actualResult := processText(inputText)
+	actualResult := preProcessWord(inputText)
 
 	// Then
 	assert.Equal(t, expectedResult, actualResult)
@@ -98,31 +97,31 @@ func TestProcessTextStopWord(t *testing.T) {
 	expectedResult := ""
 
 	// When
-	actualResult := processText(inputText)
+	actualResult := preProcessWord(inputText)
 
 	// Then
 	assert.Equal(t, expectedResult, actualResult)
 }
 
-func TestMakeWordMap(t *testing.T) {
-	// Given
-	inputText := []string{"quick", "brown", "fox", "quick"}
-	noOfReducers := "2"
-
-	expectedResult := map[string][]WordData{
-		"0": {
-			{Word: "quick", SortedWord: "cikqu"},
-			{Word: "fox", SortedWord: "fox"},
-			{Word: "quick", SortedWord: "cikqu"},
-		},
-		"1": {
-			{Word: "brown", SortedWord: "bnorw"},
-		},
-	}
-
-	// When
-	actualResult := makeWordMap(inputText, noOfReducers)
-
-	// Then
-	assert.Equal(t, expectedResult, actualResult)
-}
+//func TestMakeWordMap(t *testing.T) {
+//	// Given
+//	inputText := []string{"quick", "brown", "fox", "quick"}
+//	noOfReducers := "2"
+//
+//	expectedResult := map[string][]WordData{
+//		"0": {
+//			{Word: "quick", SortedWord: "cikqu"},
+//			{Word: "fox", SortedWord: "fox"},
+//			{Word: "quick", SortedWord: "cikqu"},
+//		},
+//		"1": {
+//			{Word: "brown", SortedWord: "bnorw"},
+//		},
+//	}
+//
+//	// When
+//	actualResult := makeWordMap(inputText, noOfReducers)
+//
+//	// Then
+//	assert.Equal(t, expectedResult, actualResult)
+//}

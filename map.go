@@ -1,14 +1,10 @@
 package serverless_mapreduce
 
 import (
-	"cloud.google.com/go/pubsub"
 	"context"
 	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
 	"github.com/cloudevents/sdk-go/v2/event"
-	"hash/fnv"
-	"log"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 )
@@ -19,88 +15,42 @@ func init() {
 
 func mapper(ctx context.Context, e event.Event) error {
 	var text []string
-	client, attributes, err := ReadPubSubMessage(ctx, e, &text)
+	client, _, err := ReadPubSubMessage(ctx, e, &text)
 	if err != nil {
 		return err
 	}
 	defer client.Close()
+	var mappedText []WordData
 	var wg sync.WaitGroup
-	// Send a slice of key value pairs to each reducer to prevent too many function invocations
-	reducerWordMap := makeWordMap(text, attributes["noOfReducers"])
-	// Create topic object for each reducer
-	var topics []*pubsub.Topic
-	for reducerNum := range reducerWordMap {
-		topics = append(topics, client.Topic("mapreduce-shuffler-"+reducerNum))
-	}
-	// Stop the topics when done
-	defer func() {
-		for _, topic := range topics {
-			topic.Stop()
-		}
-	}()
-	for reducerNum, wordData := range reducerWordMap {
+	var mu sync.Mutex
+	for _, word := range text {
 		wg.Add(1)
-		reducerNumInt, err := strconv.Atoi(reducerNum)
-		if err != nil {
-			return err
-		}
-		go SendPubSubMessage(ctx, &wg, topics[reducerNumInt], wordData, attributes)
+		go mapWord(&wg, &mu, &mappedText, word)
 	}
 	wg.Wait()
+	// Send the mapped text to the shuffler
+	topic := client.Topic("mapreduce-shuffler")
+	defer topic.Stop()
+	SendPubSubMessage(ctx, nil, topic, mappedText, nil)
 	return nil
 }
 
-func makeWordMap(text []string, noOfReducers string) map[string][]WordData {
-	wordMap := make(map[string][]WordData)
-	var mu sync.Mutex
-	var wg sync.WaitGroup
-	for _, word := range text {
-		wg.Add(1)
-		w := word
-		go func() {
-			defer wg.Done()
-			processedWord := processText(w)
-			if processedWord == "" {
-				return
-			}
-			// sort string into alphabetical order
-			splitWord := strings.Split(processedWord, "")
-			sort.Strings(splitWord)
-			sortedWord := strings.Join(splitWord, "")
-			reducerNum, err := shuffle(sortedWord, noOfReducers)
-			if err != nil {
-				log.Printf("Error finding reducer number: %v", err)
-				return
-			}
-			mu.Lock()
-			defer mu.Unlock()
-			if wordMap[reducerNum] == nil {
-				wordMap[reducerNum] = make([]WordData, 0)
-			}
-			wordMap[reducerNum] = append(wordMap[reducerNum], WordData{
-				SortedWord: sortedWord,
-				Word:       processedWord,
-			})
-		}()
+func mapWord(wg *sync.WaitGroup, mu *sync.Mutex, mappedText *[]WordData, word string) {
+	defer wg.Done()
+	preProcessedWord := preProcessWord(word)
+	if preProcessedWord == "" {
+		return
 	}
-	wg.Wait()
-	return wordMap
+	// sort string into alphabetical order
+	splitWord := strings.Split(preProcessedWord, "")
+	sort.Strings(splitWord)
+	sortedWord := strings.Join(splitWord, "")
+	mu.Lock()
+	*mappedText = append(*mappedText, WordData{SortedWord: sortedWord, Word: preProcessedWord})
+	mu.Unlock()
 }
 
-// shuffle takes a word and returns the reducer number it should be sent to by taking the modulus of the
-// hashed word with the total number of reducers
-func shuffle(s string, noOfReducers string) (string, error) {
-	h := fnv.New32a()
-	h.Write([]byte(s))
-	hashedString := h.Sum32()
-	noOfReducersInt, err := strconv.Atoi(noOfReducers)
-	if err != nil {
-		return "", err
-	}
-	return strconv.Itoa(int(hashedString % uint32(noOfReducersInt))), nil
-}
-
-func processText(word string) string {
+func preProcessWord(word string) string {
 	// Create a map containing all the stopwords as keys since Golang doesn't have sets
 	stopwords := map[string]struct{}{"'tis": {}, "'twas": {}, "a": {}, "able": {}, "about": {}, "across": {},
 		"after": {}, "ain't": {}, "all": {}, "almost": {}, "also": {}, "am": {}, "among": {}, "an": {}, "and": {},

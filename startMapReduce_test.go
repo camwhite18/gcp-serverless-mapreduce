@@ -24,7 +24,7 @@ func TestStartMapReduce(t *testing.T) {
 	expectedResponse := `{"responseCode":200,"message":"MapReduce started successfully"}`
 	expectedResult := SplitterData{
 		BucketName: BUCKET_NAME,
-		FileNames:  []string{"test.txt"},
+		FileName:   "test.txt",
 	}
 
 	// When

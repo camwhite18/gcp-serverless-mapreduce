@@ -1,10 +1,10 @@
 package serverless_mapreduce
 
 import (
-	"cloud.google.com/go/pubsub"
 	"cloud.google.com/go/storage"
 	"context"
 	"encoding/binary"
+	"fmt"
 	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
 	"github.com/cloudevents/sdk-go/v2/event"
 	"io"
@@ -26,34 +26,23 @@ func splitter(ctx context.Context, e event.Event) error {
 		return err
 	}
 	defer client.Close()
-	var wg sync.WaitGroup
-	for _, file := range splitterData.FileNames {
-		wg.Add(1)
-		readFileAndSendToMapper(ctx, &wg, attributes, client, splitterData.BucketName, file)
-	}
-	wg.Wait()
-	return nil
-}
-
-func readFileAndSendToMapper(ctx context.Context, wg *sync.WaitGroup, attributes map[string]string, client *pubsub.Client, bucketName, objectName string) {
-	defer wg.Done()
-	data, err := readFileFromBucket(ctx, bucketName, objectName)
+	data, err := readFileFromBucket(ctx, splitterData.BucketName, splitterData.FileName)
 	if err != nil {
-		log.Printf("error reading file from bucket: %v", err)
-		return
+		return fmt.Errorf("error reading file from bucket: %v", err)
 	}
 	data = removeBookHeaderAndFooter(data)
 	// Split the file into a list of words
 	splitText := strings.Fields(string(data))
 	partitionedText := partitionFile(splitText, MAX_MESSAGE_SIZE_BYTES)
-	topic := client.Topic("mapreduce-mapper-" + attributes["mapper"])
+	topic := client.Topic("mapreduce-mapper")
 	defer topic.Stop()
-	var wg2 sync.WaitGroup
+	var wg sync.WaitGroup
 	for _, partition := range partitionedText {
-		wg2.Add(1)
-		go SendPubSubMessage(ctx, &wg2, topic, partition, attributes)
+		wg.Add(1)
+		go SendPubSubMessage(ctx, &wg, topic, partition, attributes)
 	}
-	wg2.Wait()
+	wg.Wait()
+	return nil
 }
 
 func readFileFromBucket(ctx context.Context, bucketName, objectName string) ([]byte, error) {

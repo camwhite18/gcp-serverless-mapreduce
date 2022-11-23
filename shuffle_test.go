@@ -10,30 +10,28 @@ import (
 	"time"
 )
 
-func TestSplitter(t *testing.T) {
+func TestShuffler(t *testing.T) {
 	// Setup test
-	teardown, subscription := SetupTest(t, "mapreduce-mapper-0")
+	teardown, subscription := SetupTest(t, "mapreduce-reducer-0")
 	defer teardown(t)
-	teardownTestStorage := createTestStorage(t)
-	defer teardownTestStorage(t)
-
 	// Given
 	// Create a message
-	inputData := SplitterData{
-		BucketName: BUCKET_NAME,
-		FileName:   "test.txt",
+	inputData := []WordData{
+		{Word: "quick", SortedWord: "cikqu"},
+		{Word: "brown", SortedWord: "bnorw"},
+		{Word: "fox", SortedWord: "fox"},
+		{Word: "quick", SortedWord: "cikqu"},
 	}
 	inputDataBytes, err := json.Marshal(inputData)
 	if err != nil {
-		t.Fatalf("Error marshalling splitter data: %v", err)
+		t.Fatalf("Error marshalling shuffler data: %v", err)
 	}
 	message := MessagePublishedData{
 		Message: PubSubMessage{
-			Data:       inputDataBytes,
-			Attributes: map[string]string{"instanceId": "12345", "noOfMappers": "1", "noOfReducers": "1", "mapper": "0"},
+			Data: inputDataBytes,
 		},
 	}
-	// Create a CloudEvent to be sent to the mapper
+	// Create a CloudEvent to be sent to the shuffler
 	e := event.New()
 	e.SetDataContentType("application/json")
 	err = e.SetData(e.DataContentType(), message)
@@ -41,10 +39,13 @@ func TestSplitter(t *testing.T) {
 		t.Fatalf("Error setting event data: %v", err)
 	}
 
-	expectedResult := []string{"The", "quick", "brown", "fox", "jumps", "over", "the", "lazy", "dog."}
+	expectedResult := []WordData{
+		{Word: "quick", SortedWord: "cikqu"},
+		{Word: "quick", SortedWord: "cikqu"},
+	}
 
 	// When
-	err = splitter(context.Background(), e)
+	err = shuffler(context.Background(), e)
 
 	// Then
 	// Ensure there are no errors returned
@@ -52,7 +53,7 @@ func TestSplitter(t *testing.T) {
 	// The subscription will listen forever unless given a context with a timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	var actualResult []string
+	var actualResult []WordData
 	err = subscription.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
 		// Unmarshal the message data into the WordData struct
 		err := json.Unmarshal(msg.Data, &actualResult)
@@ -67,16 +68,13 @@ func TestSplitter(t *testing.T) {
 	assert.Nil(t, err)
 }
 
-func TestRemoveBookHeaderAndFooter(t *testing.T) {
+func TestPartition(t *testing.T) {
 	// Given
-	inputText := []byte(`#SOME BOOK HEADER# *** START OF THIS PROJECT GUTENBERG EBOOK SOME TITLE *** The quick brown fox jumps over the lazy dog.
-*** END OF THE PROJECT GUTENBERG EBOOK SOME TITLE *** #SOME BOOK FOOTER#`)
-	expectedResult := []byte(`The quick brown fox jumps over the lazy dog.
-`)
+	inputData := "quick"
 
 	// When
-	actualResult := removeBookHeaderAndFooter(inputText)
+	reducerNum := partition(inputData)
 
 	// Then
-	assert.Equal(t, expectedResult, actualResult)
+	assert.Equal(t, 2, reducerNum)
 }
