@@ -12,15 +12,12 @@ import (
 
 func TestShuffler(t *testing.T) {
 	// Setup test
-	teardown, subscription := SetupTest(t, "mapreduce-reducer-0")
+	teardown, subscription := SetupTest(t, "mapreduce-reducer-1")
 	defer teardown(t)
 	// Given
 	// Create a message
-	inputData := []WordData{
-		{Word: "quick", SortedWord: "cikqu"},
-		{Word: "brown", SortedWord: "bnorw"},
-		{Word: "fox", SortedWord: "fox"},
-		{Word: "quick", SortedWord: "cikqu"},
+	inputData := []CombinedWordData{
+		{SortedWord: "acer", Anagrams: []string{"care", "race"}},
 	}
 	inputDataBytes, err := json.Marshal(inputData)
 	if err != nil {
@@ -39,9 +36,8 @@ func TestShuffler(t *testing.T) {
 		t.Fatalf("Error setting event data: %v", err)
 	}
 
-	expectedResult := []WordData{
-		{Word: "quick", SortedWord: "cikqu"},
-		{Word: "quick", SortedWord: "cikqu"},
+	expectedResult := []CombinedWordData{
+		{SortedWord: "acer", Anagrams: []string{"care", "race"}},
 	}
 
 	// When
@@ -53,7 +49,7 @@ func TestShuffler(t *testing.T) {
 	// The subscription will listen forever unless given a context with a timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	var actualResult []WordData
+	var actualResult []CombinedWordData
 	err = subscription.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
 		// Unmarshal the message data into the WordData struct
 		err := json.Unmarshal(msg.Data, &actualResult)
@@ -70,11 +66,11 @@ func TestShuffler(t *testing.T) {
 
 func TestPartition(t *testing.T) {
 	// Given
-	inputData := "quick"
+	inputData := "acer"
 
 	// When
 	reducerNum := partition(inputData)
 
 	// Then
-	assert.Equal(t, 2, reducerNum)
+	assert.Equal(t, 1, reducerNum)
 }
