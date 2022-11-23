@@ -25,7 +25,7 @@ type Response struct {
 func startMapreduce(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	// Get the query parameters
-	bucketName := r.URL.Query().Get("bucketName")
+	bucketName := r.URL.Query().Get("bucket")
 	files, err := readFileNamesInBucket(bucketName)
 	if err != nil {
 		writeResponse(w, http.StatusInternalServerError, err.Error())

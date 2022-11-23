@@ -12,7 +12,7 @@ import (
 )
 
 func TestStartMapReduce(t *testing.T) {
-	teardown, subscription := SetupTest(t, "mapreduce-splitter-0")
+	teardown, subscription := SetupTest(t, "mapreduce-splitter")
 	defer teardown(t)
 	teardownTestStorage := createTestStorage(t)
 	defer teardownTestStorage(t)
