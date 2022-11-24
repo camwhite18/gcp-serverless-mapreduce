@@ -68,4 +68,11 @@ for ((i=0;i<num_reducers;i++)) do
     echo "Failed to deploy reducer $i"
     exit 1
   fi
+
+  # Change the backoff delay of the subscription to start at 1 second
+  subscription=$(gcloud pubsub subscriptions list | grep "eventarc-europe-west2-reducer-$i" | cut -c 7-)
+  echo "Changing backoff delay of subscription $subscription"
+  gcloud pubsub subscriptions update "$subscription" \
+    --project=serverless-mapreduce \
+    --min-retry-delay=1s
 done

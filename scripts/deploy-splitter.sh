@@ -24,8 +24,16 @@ if (gcloud functions deploy splitter \
     --source=. \
     --entry-point Splitter \
     --region=europe-west2 \
+    --memory=512MB \
     --project=serverless-mapreduce) ; then
   echo "Successfully deployed splitter"
 else
   echo "Failed to deploy splitter"
 fi
+
+# Change the backoff delay of the subscription to start at 1 second
+subscription=$(gcloud pubsub subscriptions list | grep "eventarc-europe-west2-splitter" | cut -c 7-)
+echo "Changing backoff delay of subscription $subscription"
+gcloud pubsub subscriptions update "$subscription" \
+  --project=serverless-mapreduce \
+  --min-retry-delay=1s
