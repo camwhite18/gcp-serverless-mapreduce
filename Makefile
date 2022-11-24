@@ -40,6 +40,7 @@ deploy-start-mapreduce:
 		--source=. \
 		--entry-point StartMapreduce \
 		--region=$(GCP_REGION) \
+		--memory=512MB \
 		--project=$(GCP_PROJECT)
 
 remove-start-mapreduce:
