@@ -58,6 +58,7 @@ func mapWord(wg *sync.WaitGroup, mu *sync.Mutex, mappedText *[]WordData, word st
 }
 
 // preProcessWord strips any punctuation from the word and converts it to lowercase. It also removes a word if it
+// is a stop word or contains any numbers or symbols.
 func preProcessWord(word string) string {
 	// Create a map containing all the stopwords as keys since Golang doesn't have sets
 	stopwords := map[string]struct{}{"'tis": {}, "'twas": {}, "a": {}, "able": {}, "about": {}, "across": {},
