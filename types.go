@@ -4,9 +4,9 @@ import "time"
 
 const NO_OF_REDUCER_INSTANCES = 5
 
-const MAX_MESSAGE_SIZE_BYTES = 1000000
-const MAX_MESSAGE_COUNT = 1000
-const MAX_MESSAGE_DELAY = 100 * time.Millisecond
+const MAX_MESSAGE_SIZE_BYTES = 100000
+const MAX_MESSAGE_COUNT = 100
+const MAX_MESSAGE_DELAY = 50 * time.Millisecond
 
 type MessagePublishedData struct {
 	Message PubSubMessage

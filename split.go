@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 )
 
 func init() {
@@ -20,6 +21,7 @@ func init() {
 }
 
 func splitter(ctx context.Context, e event.Event) error {
+	start := time.Now()
 	splitterData := SplitterData{}
 	client, attributes, err := ReadPubSubMessage(ctx, e, &splitterData)
 	if err != nil {
@@ -42,6 +44,7 @@ func splitter(ctx context.Context, e event.Event) error {
 		go SendPubSubMessage(ctx, &wg, topic, partition, attributes)
 	}
 	wg.Wait()
+	log.Printf("Splitter took %s", time.Since(start))
 	return nil
 }
 
