@@ -67,8 +67,8 @@ func TestReducer(t *testing.T) {
 	defer teardown(t)
 	teardownRedis := SetupRedisTest(t)
 	defer teardownRedis(t)
-	wordDataSlice := []CombinedWordData{
-		{SortedWord: "acer", Anagrams: []string{"care", "race"}},
+	wordDataSlice := []WordData{
+		{SortedWord: "acer", Anagrams: map[string]struct{}{"care": {}, "race": {}}},
 	}
 	// Create a message
 	wordDataBytes, err := json.Marshal(wordDataSlice)
@@ -122,7 +122,7 @@ func TestReducerEfficiency(t *testing.T) {
 	defer teardownRedis(t)
 	var wordDataSlice []WordData
 	for i := 0; i < 10000; i++ {
-		wordDataSlice = append(wordDataSlice, WordData{Word: "quick", SortedWord: "cikqu"})
+		wordDataSlice = append(wordDataSlice, WordData{Anagrams: map[string]struct{}{"quick": {}}, SortedWord: "cikqu"})
 	}
 	// Create a message
 	wordDataBytes, err := json.Marshal(wordDataSlice)

@@ -17,8 +17,11 @@ func TestCombine(t *testing.T) {
 	// Given
 	// Create a message
 	inputData := []WordData{
-		{Word: "care", SortedWord: "acer"},
-		{Word: "race", SortedWord: "acer"},
+		{Anagrams: map[string]struct{}{"care": {}}, SortedWord: "acer"},
+		{Anagrams: map[string]struct{}{"part": {}}, SortedWord: "artp"},
+		{Anagrams: map[string]struct{}{"race": {}}, SortedWord: "acer"},
+		{Anagrams: map[string]struct{}{"care": {}}, SortedWord: "acer"},
+		{Anagrams: map[string]struct{}{"trap": {}}, SortedWord: "artp"},
 	}
 	inputDataBytes, err := json.Marshal(inputData)
 	if err != nil {
@@ -37,8 +40,9 @@ func TestCombine(t *testing.T) {
 		t.Fatalf("Error setting event data: %v", err)
 	}
 
-	expectedResult := []CombinedWordData{
-		{SortedWord: "acer", Anagrams: []string{"care", "race"}},
+	expectedResult := []WordData{
+		{SortedWord: "acer", Anagrams: map[string]struct{}{"care": {}, "race": {}}},
+		{SortedWord: "artp", Anagrams: map[string]struct{}{"part": {}, "trap": {}}},
 	}
 
 	// When
@@ -50,7 +54,7 @@ func TestCombine(t *testing.T) {
 	// The subscription will listen forever unless given a context with a timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	var actualResult []CombinedWordData
+	var actualResult []WordData
 	err = subscription.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
 		// Unmarshal the message data into the WordData struct
 		err := json.Unmarshal(msg.Data, &actualResult)

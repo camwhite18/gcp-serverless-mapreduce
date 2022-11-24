@@ -19,12 +19,7 @@ type PubSubMessage struct {
 
 type WordData struct {
 	SortedWord string
-	Word       string
-}
-
-type CombinedWordData struct {
-	SortedWord string
-	Anagrams   []string
+	Anagrams   map[string]struct{}
 }
 
 type SplitterData struct {

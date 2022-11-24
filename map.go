@@ -26,11 +26,9 @@ func mapper(ctx context.Context, e event.Event) error {
 	var mappedText []WordData
 	var wg sync.WaitGroup
 	var mu sync.Mutex
-	uniqueWords := make(map[string]struct{})
-	var mapMu sync.Mutex
 	for _, word := range text {
 		wg.Add(1)
-		go mapWord(&wg, &mu, &mappedText, &mapMu, &uniqueWords, word)
+		go mapWord(&wg, &mu, &mappedText, word)
 	}
 	wg.Wait()
 	// Send the mapped text to the shuffler
@@ -41,11 +39,10 @@ func mapper(ctx context.Context, e event.Event) error {
 	return nil
 }
 
-func mapWord(wg *sync.WaitGroup, mu *sync.Mutex, mappedText *[]WordData, mapMu *sync.Mutex,
-	uniqueWords *map[string]struct{}, word string) {
+func mapWord(wg *sync.WaitGroup, mu *sync.Mutex, mappedText *[]WordData, word string) {
 	defer wg.Done()
 	// Do some preprocessing on the word
-	preProcessedWord := preProcessWord(word, mapMu, uniqueWords)
+	preProcessedWord := preProcessWord(word)
 	if preProcessedWord == "" {
 		return
 	}
@@ -53,13 +50,15 @@ func mapWord(wg *sync.WaitGroup, mu *sync.Mutex, mappedText *[]WordData, mapMu *
 	splitWord := strings.Split(preProcessedWord, "")
 	sort.Strings(splitWord)
 	sortedWord := strings.Join(splitWord, "")
+	anagrams := make(map[string]struct{})
+	anagrams[preProcessedWord] = struct{}{}
 	mu.Lock()
-	*mappedText = append(*mappedText, WordData{SortedWord: sortedWord, Word: preProcessedWord})
+	*mappedText = append(*mappedText, WordData{SortedWord: sortedWord, Anagrams: anagrams})
 	mu.Unlock()
 }
 
 // preProcessWord strips any punctuation from the word and converts it to lowercase. It also removes a word if it
-func preProcessWord(word string, mapMu *sync.Mutex, uniqueWordsMap *map[string]struct{}) string {
+func preProcessWord(word string) string {
 	// Create a map containing all the stopwords as keys since Golang doesn't have sets
 	stopwords := map[string]struct{}{"'tis": {}, "'twas": {}, "a": {}, "able": {}, "about": {}, "across": {},
 		"after": {}, "ain't": {}, "all": {}, "almost": {}, "also": {}, "am": {}, "among": {}, "an": {}, "and": {},
@@ -90,18 +89,8 @@ func preProcessWord(word string, mapMu *sync.Mutex, uniqueWordsMap *map[string]s
 	// Remove punctuation
 	word = strings.Trim(word, ".,;:!?\" ")
 	// Remove the word if it is a stopword or contains numbers or symbols
-	if _, ok := stopwords[word]; ok || !wordIsUnique(word, mapMu, uniqueWordsMap) || strings.ContainsAny(word, "0123456789*+-_&^%$#@!~`|}{[]\\:;\"'<>,.?/") {
+	if _, ok := stopwords[word]; ok || strings.ContainsAny(word, "0123456789*+-_&^%$#@!~`|}{[]\\:;\"'<>,.?/") {
 		return ""
 	}
 	return word
-}
-
-func wordIsUnique(word string, mapMu *sync.Mutex, uniqueWords *map[string]struct{}) bool {
-	if _, ok := (*uniqueWords)[word]; ok {
-		return false
-	}
-	mapMu.Lock()
-	(*uniqueWords)[word] = struct{}{}
-	mapMu.Unlock()
-	return true
 }

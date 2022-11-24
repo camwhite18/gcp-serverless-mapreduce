@@ -18,17 +18,22 @@ func combine(ctx context.Context, e event.Event) error {
 	}
 	defer client.Close()
 
-	// Combine the list of key-value pairs into a list of key-list pairs
-	combinedTextMap := make(map[string][]string)
+	// Do a mini reduce on the data from the mapper.
+	// Use map[string]struct{} to act as a set to remove duplicate words.
+	combinedWordDataMap := make(map[string]map[string]struct{})
 	for _, pair := range wordData {
-		if combinedTextMap[pair.SortedWord] == nil {
-			combinedTextMap[pair.SortedWord] = make([]string, 0)
+		if combinedWordDataMap[pair.SortedWord] == nil {
+			combinedWordDataMap[pair.SortedWord] = pair.Anagrams
+		} else {
+			for k, v := range pair.Anagrams {
+				combinedWordDataMap[pair.SortedWord][k] = v
+			}
 		}
-		combinedTextMap[pair.SortedWord] = append(combinedTextMap[pair.SortedWord], pair.Word)
 	}
-	combinedText := make([]CombinedWordData, 0)
-	for key, value := range combinedTextMap {
-		combinedText = append(combinedText, CombinedWordData{key, value})
+	// Convert the map to a slice
+	combinedText := make([]WordData, 0)
+	for k, v := range combinedWordDataMap {
+		combinedText = append(combinedText, WordData{SortedWord: k, Anagrams: v})
 	}
 	SendPubSubMessage(ctx, nil, client.Topic("mapreduce-shuffler"), combinedText, nil)
 	return nil

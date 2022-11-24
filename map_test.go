@@ -7,7 +7,6 @@ import (
 	"github.com/cloudevents/sdk-go/v2/event"
 	"github.com/stretchr/testify/assert"
 	"log"
-	"sync"
 	"testing"
 	"time"
 )
@@ -37,9 +36,9 @@ func TestMapper(t *testing.T) {
 	}
 
 	expectedResult := []WordData{
-		{Word: "quick", SortedWord: "cikqu"},
-		{Word: "brown", SortedWord: "bnorw"},
-		{Word: "fox", SortedWord: "fox"},
+		{Anagrams: map[string]struct{}{"quick": {}}, SortedWord: "cikqu"},
+		{Anagrams: map[string]struct{}{"brown": {}}, SortedWord: "bnorw"},
+		{Anagrams: map[string]struct{}{"fox": {}}, SortedWord: "fox"},
 	}
 
 	// When
@@ -72,11 +71,9 @@ func TestProcessText(t *testing.T) {
 	// Given
 	inputText := "TestString."
 	expectedResult := "teststring"
-	uniqueWordMap := make(map[string]struct{})
-	var mu sync.Mutex
 
 	// When
-	actualResult := preProcessWord(inputText, &mu, &uniqueWordMap)
+	actualResult := preProcessWord(inputText)
 
 	// Then
 	assert.Equal(t, expectedResult, actualResult)
@@ -86,11 +83,9 @@ func TestProcessTextNumber(t *testing.T) {
 	// Given
 	inputText := "Test1String"
 	expectedResult := ""
-	uniqueWordMap := make(map[string]struct{})
-	var mu sync.Mutex
 
 	// When
-	actualResult := preProcessWord(inputText, &mu, &uniqueWordMap)
+	actualResult := preProcessWord(inputText)
 
 	// Then
 	assert.Equal(t, expectedResult, actualResult)
@@ -100,11 +95,9 @@ func TestProcessTextStopWord(t *testing.T) {
 	// Given
 	inputText := "Would've"
 	expectedResult := ""
-	uniqueWordMap := make(map[string]struct{})
-	var mu sync.Mutex
 
 	// When
-	actualResult := preProcessWord(inputText, &mu, &uniqueWordMap)
+	actualResult := preProcessWord(inputText)
 
 	// Then
 	assert.Equal(t, expectedResult, actualResult)
@@ -137,8 +130,9 @@ func TestMapperPerformance(t *testing.T) {
 		t.Fatalf("Error setting event data: %v", err)
 	}
 
-	expectedResult := []WordData{
-		{Word: "quick", SortedWord: "cikqu"},
+	var expectedResult []WordData
+	for i := 0; i < 100000; i++ {
+		expectedResult = append(expectedResult, WordData{Anagrams: map[string]struct{}{"quick": {}}, SortedWord: "cikqu"})
 	}
 
 	// When
@@ -165,18 +159,4 @@ func TestMapperPerformance(t *testing.T) {
 	assert.Equal(t, expectedResult, actualResult)
 	// Ensure there are no errors returned by the receiver
 	assert.Nil(t, err)
-}
-
-func TestWordIsUnique(t *testing.T) {
-	// Given
-	word := "test"
-	uniqueWordMap := make(map[string]struct{})
-	uniqueWordMap["test"] = struct{}{}
-	var mu sync.Mutex
-
-	// When
-	actualResult := wordIsUnique(word, &mu, &uniqueWordMap)
-
-	// Then
-	assert.False(t, actualResult)
 }
