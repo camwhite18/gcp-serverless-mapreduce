@@ -53,7 +53,7 @@ func startMapreduce(w http.ResponseWriter, r *http.Request) {
 			FileName:   file,
 		}
 		wg.Add(1)
-		go SendPubSubMessage(ctx, &wg, topic, splitterData, nil)
+		go SendPubSubMessage(ctx, &wg, topic, splitterData, make(map[string]string))
 	}
 	wg.Wait()
 	writeResponse(w, http.StatusOK, "MapReduce started successfully")

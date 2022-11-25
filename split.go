@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
 	"github.com/cloudevents/sdk-go/v2/event"
+	"github.com/google/uuid"
 	"io"
 	"log"
 	"math"
@@ -36,12 +37,27 @@ func splitter(ctx context.Context, e event.Event) error {
 	// Split the file into a list of words
 	splitText := strings.Fields(string(data))
 	partitionedText := partitionFile(splitText, MAX_MESSAGE_SIZE_BYTES)
-	topic := client.Topic("mapreduce-mapper")
-	defer topic.Stop()
+	// Create a client for the mapper topic
+	mapperTopic := client.Topic("mapreduce-mapper")
+	defer mapperTopic.Stop()
+	// Create a client for the controller topic
+	controllerTopic := client.Topic("mapreduce-controller")
+	defer controllerTopic.Stop()
 	var wg sync.WaitGroup
 	for _, partition := range partitionedText {
+		partitionUuid := uuid.New()
+		attributes["partitionId"] = partitionUuid.String()
 		wg.Add(1)
-		go SendPubSubMessage(ctx, &wg, topic, partition, attributes)
+		go SendPubSubMessage(ctx, &wg, mapperTopic, partition, attributes)
+		wg.Add(1)
+		go func() {
+			statusMessage := StatusMessage{
+				Id:         partitionUuid.String(),
+				Status:     STATUS_STARTED,
+				ReducerNum: "",
+			}
+			SendPubSubMessage(ctx, &wg, controllerTopic, statusMessage, nil)
+		}()
 	}
 	wg.Wait()
 	log.Printf("Splitter took %s", time.Since(start))

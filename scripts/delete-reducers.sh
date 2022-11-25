@@ -6,37 +6,41 @@ if ! [ -x "$(command -v gcloud)" ]; then
   exit 1
 fi
 
-# Delete the shufflers
-num_shufflers=5
-for ((i=0;i<num_shufflers;i++)) do
-  echo "Deleting topic mapreduce-shuffler-$i"
-  if (gcloud pubsub topics delete mapreduce-shuffler-"$i" \
+# Delete the reducers
+num_reducers=5
+for ((i=0;i<num_reducers;i++)) do
+  ( \
+  echo "Deleting topic mapreduce-reducer-$i"
+  if (gcloud pubsub topics delete mapreduce-reducer-"$i" \
       --project=serverless-mapreduce) ; then
-    echo "Successfully deleted topic mapreduce-shuffler-$i"
+    echo "Successfully deleted topic mapreduce-reducer-$i"
   else
-    echo "Failed to delete topic mapreduce-shuffler-$i"
+    echo "Failed to delete topic mapreduce-reducer-$i"
   fi
 
-  echo "Deleting shuffler $i"
-  if (gcloud functions delete shuffler-"$i" \
+  echo "Deleting reducer $i"
+  if (gcloud functions delete reducer-"$i" \
     --gen2 \
     --region=europe-west2 \
-    --project=serverless-mapreduce) ; then
-    echo "Successfully deleted shuffler $i"
+    --project=serverless-mapreduce \
+    --quiet) ; then
+    echo "Successfully deleted reducer $i"
   else
-    echo "Failed to delete shuffler $i"
+    echo "Failed to delete reducer $i"
     exit 1
   fi
 
-  echo "Deleting Redis instance mapreduce-shuffler-$i"
-    if (gcloud redis instances delete mapreduce-shuffler-"$i" \
-        --project=serverless-mapreduce \
-        --region=europe-west2) ; then
-      echo "Successfully deleted Redis instance mapreduce-shuffler-$i"
-    else
-      echo "Failed to delete Redis instance mapreduce-shuffler-$i"
-    fi
-done
+  echo "Deleting Redis instance mapreduce-reducer-$i"
+  if (gcloud redis instances delete mapreduce-reducer-"$i" \
+      --project=serverless-mapreduce \
+      --region=europe-west2 \
+      --quiet) ; then
+    echo "Successfully deleted Redis instance mapreduce-reducer-$i"
+  else
+    echo "Failed to delete Redis instance mapreduce-reducer-$i"
+  fi
+  ) &
+done; wait
 
 # Delete the VPC connector
 if (gcloud compute networks vpc-access connectors delete mapreduce-connector \

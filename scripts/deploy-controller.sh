@@ -1,0 +1,74 @@
+#!/bin/bash
+
+# Check if gcloud is installed
+if ! [ -x "$(command -v gcloud)" ]; then
+  echo 'Error: gcloud is not installed.' >&2
+  exit 1
+fi
+
+# Create VPC connector for serverless VPC access to Redis
+if (gcloud compute networks vpc-access connectors create mapreduce-connector \
+    --project=serverless-mapreduce \
+    --network=default \
+    --region=europe-west2 \
+    --max-instances=3 \
+    --range=10.8.0.0/28) ; then
+  echo "Successfully created VPC connector"
+else
+  echo "Failed to create VPC connector or it already exists"
+fi
+
+# Create the topic, redis instance and deploy the controller
+echo "Creating topic mapreduce-controller"
+if (gcloud pubsub topics create mapreduce-controller \
+    --project=serverless-mapreduce) ; then
+  echo "Successfully created topic mapreduce-controller"
+else
+  echo "Failed to create topic mapreduce-controller"
+  exit 1
+fi
+
+echo "Creating Redis instance mapreduce-controller"
+if (gcloud redis instances create mapreduce-controller \
+    --tier=basic \
+    --region=europe-west2 \
+    --size=1 \
+    --network=default) ; then
+  echo "Successfully created Redis instance mapreduce-controller"
+else
+  echo "Failed to create Redis instance mapreduce-controller="
+  exit 1
+fi
+
+REDIS_HOST=$(gcloud redis instances describe mapreduce-controller \
+              --region=europe-west2 \
+              --format="value(host)")
+REDIS_PORT=$(gcloud redis instances describe mapreduce-controller \
+              --region=europe-west2 \
+              --format="value(port)")
+
+echo "Deploying controller"
+if (gcloud functions deploy controller \
+    --gen2 \
+    --runtime=go116 \
+    --trigger-topic mapreduce-controller \
+    --source=. \
+    --entry-point Controller \
+    --region=europe-west2 \
+    --memory=512MB \
+    --project=serverless-mapreduce \
+    --vpc-connector=projects/serverless-mapreduce/locations/europe-west2/connectors/mapreduce-connector \
+    --set-env-vars=REDIS_HOST="$REDIS_HOST",REDIS_PORT="$REDIS_PORT"
+    ) ; then
+  echo "Successfully deployed controller"
+else
+  echo "Failed to deploy controller"
+  exit 1
+fi
+
+# Change the backoff delay of the subscription to start at 1 second
+subscription=$(gcloud pubsub subscriptions list | grep "eventarc-europe-west2-controller" | cut -c 7-)
+echo "Changing backoff delay of subscription $subscription"
+gcloud pubsub subscriptions update "$subscription" \
+  --project=serverless-mapreduce \
+  --min-retry-delay=1s

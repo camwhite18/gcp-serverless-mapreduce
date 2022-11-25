@@ -16,7 +16,7 @@ func init() {
 
 func shuffler(ctx context.Context, e event.Event) error {
 	var wordData []WordData
-	client, _, err := ReadPubSubMessage(ctx, e, &wordData)
+	client, attributes, err := ReadPubSubMessage(ctx, e, &wordData)
 	if err != nil {
 		return err
 	}
@@ -37,8 +37,9 @@ func shuffler(ctx context.Context, e event.Event) error {
 	// Send the shuffled words to the reducers
 	var wg sync.WaitGroup
 	for reducerNum, wordData := range shuffledText {
+		attributes["reducerNum"] = strconv.Itoa(reducerNum)
 		wg.Add(1)
-		go SendPubSubMessage(ctx, &wg, topics[reducerNum], wordData, nil)
+		go SendPubSubMessage(ctx, &wg, topics[reducerNum], wordData, attributes)
 	}
 	wg.Wait()
 	return nil

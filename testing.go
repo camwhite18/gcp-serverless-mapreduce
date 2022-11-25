@@ -4,6 +4,8 @@ import (
 	"cloud.google.com/go/pubsub"
 	"cloud.google.com/go/storage"
 	"context"
+	"fmt"
+	"github.com/gomodule/redigo/redis"
 	"os"
 	"strings"
 	"testing"
@@ -102,6 +104,54 @@ func createTestStorage(tb testing.TB) func(tb testing.TB) {
 		}
 		// Reset the STORAGE_EMULATOR_HOST environment variable
 		err = os.Setenv("STORAGE_EMULATOR_HOST", existingStorageVal)
+		if err != nil {
+			tb.Fatalf("Error setting environment variable: %v", err)
+		}
+	}
+}
+
+func SetupRedisTest(tb testing.TB) func(tb testing.TB) {
+	// Setup test
+	// Modify the REDIS_HOST environment variable to point to the pubsub emulator
+	existingRedisHostVal := os.Getenv("REDIS_HOST")
+	err := os.Setenv("REDIS_HOST", "localhost")
+	if err != nil {
+		tb.Fatalf("Error setting environment variable: %v", err)
+	}
+	// Modify the REDIS_PORT environment variable to point to the pubsub emulator
+	existingRedisPortVal := os.Getenv("REDIS_PORT")
+	err = os.Setenv("REDIS_PORT", "6379")
+	if err != nil {
+		tb.Fatalf("Error setting environment variable: %v", err)
+	}
+
+	// Connect to redis
+	redisHost := os.Getenv("REDIS_HOST")
+	redisPort := os.Getenv("REDIS_PORT")
+	redisAddress := fmt.Sprintf("%s:%s", redisHost, redisPort)
+	const maxConnections = 10
+	redisPool = &redis.Pool{
+		MaxIdle: maxConnections,
+		Dial: func() (redis.Conn, error) {
+			return redis.Dial("tcp", redisAddress)
+		},
+	}
+
+	return func(tb testing.TB) {
+		// Teardown test
+		conn := redisPool.Get()
+		defer conn.Close()
+		_, err := conn.Do("FLUSHALL")
+		if err != nil {
+			tb.Fatalf("Error getting data from redis: %v", err)
+		}
+		// Reset the REDIS_HOST environment variable
+		err = os.Setenv("REDIS_HOST", existingRedisHostVal)
+		if err != nil {
+			tb.Fatalf("Error setting environment variable: %v", err)
+		}
+		// Reset the REDIS_PORT environment variable
+		err = os.Setenv("REDIS_PORT", existingRedisPortVal)
 		if err != nil {
 			tb.Fatalf("Error setting environment variable: %v", err)
 		}

@@ -6,7 +6,7 @@ if ! [ -x "$(command -v gcloud)" ]; then
   exit 1
 fi
 
- Create VPC connector for serverless VPC access to Redis
+# Create VPC connector for serverless VPC access to Redis
 if (gcloud compute networks vpc-access connectors create mapreduce-connector \
     --project=serverless-mapreduce \
     --network=default \
@@ -20,8 +20,9 @@ else
 fi
 
 # Create the topics, redis instances and deploy the mappers
-num_reducers=1
-for ((i=0;i<num_reducers;i++)) do
+num_reducers=5
+for ((i=1;i<num_reducers;i++)) do
+  ( \
   echo "Creating topic mapreduce-reducer-$i"
   if (gcloud pubsub topics create mapreduce-reducer-"$i" \
       --project=serverless-mapreduce) ; then
@@ -75,4 +76,5 @@ for ((i=0;i<num_reducers;i++)) do
   gcloud pubsub subscriptions update "$subscription" \
     --project=serverless-mapreduce \
     --min-retry-delay=1s
-done
+  ) &
+done; wait

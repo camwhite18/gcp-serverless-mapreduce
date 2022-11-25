@@ -12,7 +12,7 @@ func init() {
 
 func combine(ctx context.Context, e event.Event) error {
 	var wordData []WordData
-	client, _, err := ReadPubSubMessage(ctx, e, &wordData)
+	client, attributes, err := ReadPubSubMessage(ctx, e, &wordData)
 	if err != nil {
 		return err
 	}
@@ -35,6 +35,6 @@ func combine(ctx context.Context, e event.Event) error {
 	for k, v := range combinedWordDataMap {
 		combinedText = append(combinedText, WordData{SortedWord: k, Anagrams: v})
 	}
-	SendPubSubMessage(ctx, nil, client.Topic("mapreduce-shuffler"), combinedText, nil)
+	SendPubSubMessage(ctx, nil, client.Topic("mapreduce-shuffler"), combinedText, attributes)
 	return nil
 }
