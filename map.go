@@ -18,7 +18,7 @@ func init() {
 func mapper(ctx context.Context, e event.Event) error {
 	start := time.Now()
 	var text []string
-	client, _, err := ReadPubSubMessage(ctx, e, &text)
+	client, attributes, err := ReadPubSubMessage(ctx, e, &text)
 	if err != nil {
 		return err
 	}
@@ -31,10 +31,10 @@ func mapper(ctx context.Context, e event.Event) error {
 		go mapWord(&wg, &mu, &mappedText, word)
 	}
 	wg.Wait()
-	// Send the mapped text to the shuffler
 	topic := client.Topic("mapreduce-combine")
 	defer topic.Stop()
-	SendPubSubMessage(ctx, nil, topic, mappedText, nil)
+	// Send one pubsub message to the combiner per book to reduce the number of invocations -> reduce cost
+	SendPubSubMessage(ctx, nil, topic, mappedText, attributes)
 	log.Printf("Mapper took %v to run", time.Since(start))
 	return nil
 }

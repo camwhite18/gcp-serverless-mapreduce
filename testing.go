@@ -6,15 +6,17 @@ import (
 	"context"
 	"fmt"
 	"github.com/gomodule/redigo/redis"
+	"google.golang.org/api/iterator"
 	"os"
 	"strings"
 	"testing"
 	"time"
 )
 
-const BUCKET_NAME = "test-bucket"
+const INPUT_BUCKET_NAME = "test-bucket-input"
+const OUTPUT_BUCKET_NAME = "test-bucket-output"
 
-func SetupTest(tb testing.TB, topicID string) (func(tb testing.TB), *pubsub.Subscription) {
+func SetupTest(tb testing.TB, topicIDs []string) (func(tb testing.TB), []*pubsub.Subscription) {
 	// Setup test
 	// Modify the PUBSUB_EMULATOR_HOST environment variable to point to the pubsub emulator
 	existingVal := os.Getenv("PUBSUB_EMULATOR_HOST")
@@ -29,33 +31,41 @@ func SetupTest(tb testing.TB, topicID string) (func(tb testing.TB), *pubsub.Subs
 	if err != nil {
 		tb.Fatalf("Error creating pubsub client: %v", err)
 	}
-	t, err := client.CreateTopic(context.Background(), topicID)
-	if err != nil {
-		tb.Fatalf("Error creating topic: %v", err)
-	}
-	subscription, err := client.CreateSubscription(context.Background(), topicID, pubsub.SubscriptionConfig{
-		Topic: t,
-	})
-	if err != nil {
-		tb.Fatalf("Error creating subscription: %v", err)
+	topics := make([]*pubsub.Topic, len(topicIDs))
+	subscriptions := make([]*pubsub.Subscription, len(topicIDs))
+	for i, topicID := range topicIDs {
+		t, err := client.CreateTopic(context.Background(), topicID)
+		if err != nil {
+			tb.Fatalf("Error creating topic: %v", err)
+		}
+		subscription, err := client.CreateSubscription(context.Background(), topicID, pubsub.SubscriptionConfig{
+			Topic: t,
+		})
+		if err != nil {
+			tb.Fatalf("Error creating subscription: %v", err)
+		}
+		topics[i] = t
+		subscriptions[i] = subscription
 	}
 
 	return func(tb testing.TB) {
 		// Teardown test
-		// Delete the subscription
-		if err := subscription.Delete(context.Background()); err != nil {
-			tb.Fatalf("Error deleting subscription: %v", err)
-		}
-		// Delete the topic
-		if err := t.Delete(context.Background()); err != nil {
-			tb.Fatalf("Error deleting topic: %v", err)
+		// Delete the subscriptions
+		for i := 0; i < len(topicIDs); i++ {
+			if err := subscriptions[i].Delete(context.Background()); err != nil {
+				tb.Fatalf("Error deleting subscription: %v", err)
+			}
+			// Delete the topics
+			if err := topics[i].Delete(context.Background()); err != nil {
+				tb.Fatalf("Error deleting topic: %v", err)
+			}
 		}
 		// Reset the PUBSUB_EMULATOR_HOST environment variable
 		err = os.Setenv("PUBSUB_EMULATOR_HOST", existingVal)
 		if err != nil {
 			tb.Fatalf("Error setting environment variable: %v", err)
 		}
-	}, subscription
+	}, subscriptions
 }
 
 func createTestStorage(tb testing.TB) func(tb testing.TB) {
@@ -67,27 +77,36 @@ func createTestStorage(tb testing.TB) func(tb testing.TB) {
 	if err != nil {
 		tb.Fatalf("Error setting environment variable: %v", err)
 	}
-	// Create a storage client so we can create a bucket
+	// Create a storage client so we can create buckets
 	client, err := storage.NewClient(ctx)
 	if err != nil {
 		tb.Fatalf("Error creating storage client: %v", err)
 	}
-	bucket := client.Bucket(BUCKET_NAME)
+	// Create the input bucket
+	inputBucket := client.Bucket(INPUT_BUCKET_NAME)
 	createStorageCtx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
-	if err := bucket.Create(createStorageCtx, "serverless-mapreduce", nil); err != nil &&
+	if err := inputBucket.Create(createStorageCtx, "serverless-mapreduce", nil); err != nil &&
 		!strings.Contains(err.Error(), "already own this bucket") {
-		tb.Fatalf("Error creating bucket: %v", err)
+		tb.Fatalf("Error creating inputBucket: %v", err)
 	}
 	// Create a file in the bucket
-	object := bucket.Object("test.txt")
+	object := inputBucket.Object("test.txt")
 	writer := object.NewWriter(createStorageCtx)
 	if _, err := writer.Write([]byte("#This text will be removed# *** START OF THIS PROJECT GUTENBERG EBOOK *** The " +
 		"quick brown fox jumps over the lazy dog.")); err != nil {
-		tb.Fatalf("Error writing to bucket: %v", err)
+		tb.Fatalf("Error writing to inputBucket: %v", err)
 	}
 	if err := writer.Close(); err != nil {
-		tb.Fatalf("Error closing bucket: %v", err)
+		tb.Fatalf("Error closing inputBucket: %v", err)
+	}
+	// Create the output bucket
+	outputBucket := client.Bucket(OUTPUT_BUCKET_NAME)
+	createOutputStorageCtx, cancel := context.WithTimeout(ctx, time.Second*10)
+	defer cancel()
+	if err := outputBucket.Create(createOutputStorageCtx, "serverless-mapreduce", nil); err != nil &&
+		!strings.Contains(err.Error(), "already own this bucket") {
+		tb.Fatalf("Error creating inputBucket: %v", err)
 	}
 
 	return func(tb testing.TB) {
@@ -98,9 +117,27 @@ func createTestStorage(tb testing.TB) func(tb testing.TB) {
 		if err := object.Delete(deleteStorageCtx); err != nil {
 			tb.Fatalf("Error deleting object: %v", err)
 		}
-		// Delete the bucket
-		if err := bucket.Delete(deleteStorageCtx); err != nil {
-			tb.Fatalf("Error deleting bucket: %v", err)
+		// Delete the input bucket
+		if err := inputBucket.Delete(deleteStorageCtx); err != nil {
+			tb.Fatalf("Error deleting input bucket: %v", err)
+		}
+		// Delete the files in the output bucket
+		it := outputBucket.Objects(deleteStorageCtx, nil)
+		for {
+			attrs, err := it.Next()
+			if err == iterator.Done {
+				break
+			}
+			if err != nil {
+				tb.Fatalf("Error listing output bucket: %v", err)
+			}
+			if err := outputBucket.Object(attrs.Name).Delete(deleteStorageCtx); err != nil {
+				tb.Fatalf("Error deleting object: %v", err)
+			}
+		}
+		// Delete the output bucket
+		if err := outputBucket.Delete(deleteStorageCtx); err != nil {
+			tb.Fatalf("Error deleting output bucket: %v", err)
 		}
 		// Reset the STORAGE_EMULATOR_HOST environment variable
 		err = os.Setenv("STORAGE_EMULATOR_HOST", existingStorageVal)

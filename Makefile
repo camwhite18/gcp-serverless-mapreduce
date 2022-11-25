@@ -32,6 +32,12 @@ remove-api-gateway:
 		--api=mapreduce-api \
 		--project=$(GCP_PROJECT)
 
+deploy-controller:
+	./scripts/deploy-controller.sh
+
+remove-controller:
+	./scripts/remove-controller.sh
+
 deploy-start-mapreduce:
 	@gcloud functions deploy start-mapreduce \
 		--gen2 \
@@ -76,9 +82,9 @@ deploy-reducer:
 remove-reducer:
 	./scripts/delete-reducers.sh
 
-deploy: create-input-bucket create-output-bucket deploy-start-mapreduce deploy-splitter deploy-mapper  deploy-combine deploy-shuffler deploy-reducer
+deploy: create-input-bucket create-output-bucket deploy-controller deploy-start-mapreduce deploy-splitter deploy-mapper  deploy-combine deploy-shuffler deploy-reducer
 
-remove: remove-splitter remove-mapper remove-combine remove-shuffler remove-reducer
+remove: remove-controller remove-start-mapreduce remove-splitter remove-mapper remove-combine remove-shuffler remove-reducer
 
 create-pubsub-emulator:
 	@docker-compose up -d pubsub-emulator

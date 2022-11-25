@@ -71,4 +71,5 @@ subscription=$(gcloud pubsub subscriptions list | grep "eventarc-europe-west2-co
 echo "Changing backoff delay of subscription $subscription"
 gcloud pubsub subscriptions update "$subscription" \
   --project=serverless-mapreduce \
-  --min-retry-delay=1s
+  --min-retry-delay=1s \
+  --max-retry-delay=10s

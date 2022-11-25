@@ -13,7 +13,7 @@ import (
 
 func TestMapper(t *testing.T) {
 	// Setup test
-	teardown, subscription := SetupTest(t, "mapreduce-combine")
+	teardown, subscriptions := SetupTest(t, []string{"mapreduce-combine"})
 	defer teardown(t)
 	// Given
 	// Create a message
@@ -24,7 +24,8 @@ func TestMapper(t *testing.T) {
 	}
 	message := MessagePublishedData{
 		Message: PubSubMessage{
-			Data: inputDataBytes,
+			Data:       inputDataBytes,
+			Attributes: make(map[string]string),
 		},
 	}
 	// Create a CloudEvent to be sent to the mapper
@@ -51,7 +52,7 @@ func TestMapper(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 	var actualResult []WordData
-	err = subscription.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
+	err = subscriptions[0].Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
 		// Unmarshal the message data into the WordData struct
 		err := json.Unmarshal(msg.Data, &actualResult)
 		if err != nil {
@@ -105,7 +106,7 @@ func TestProcessTextStopWord(t *testing.T) {
 
 func TestMapperPerformance(t *testing.T) {
 	// Setup test
-	teardown, subscription := SetupTest(t, "mapreduce-combine")
+	teardown, subscriptions := SetupTest(t, []string{"mapreduce-combine"})
 	defer teardown(t)
 	// Given
 	// Create a message
@@ -119,7 +120,8 @@ func TestMapperPerformance(t *testing.T) {
 	}
 	message := MessagePublishedData{
 		Message: PubSubMessage{
-			Data: inputDataBytes,
+			Data:       inputDataBytes,
+			Attributes: make(map[string]string),
 		},
 	}
 	// Create a CloudEvent to be sent to the mapper
@@ -147,7 +149,7 @@ func TestMapperPerformance(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 	var actualResult []WordData
-	err = subscription.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
+	err = subscriptions[0].Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
 		// Unmarshal the message data into the WordData struct
 		err := json.Unmarshal(msg.Data, &actualResult)
 		if err != nil {

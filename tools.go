@@ -15,7 +15,7 @@ func ReadPubSubMessage(ctx context.Context, e event.Event, data interface{}) (*p
 	if err := e.DataAs(&msg); err != nil {
 		return nil, nil, fmt.Errorf("error getting data from event: %v", err)
 	}
-	if err := json.Unmarshal(msg.Message.Data, &data); err != nil {
+	if err := json.Unmarshal(msg.Message.Data, &data); err != nil && data != nil {
 		return nil, nil, fmt.Errorf("error unmarshalling message: %v", err)
 	}
 	client, err := pubsub.NewClient(ctx, "serverless-mapreduce")

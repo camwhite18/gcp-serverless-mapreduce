@@ -1,18 +1,18 @@
 package serverless_mapreduce
 
 import (
+	"cloud.google.com/go/pubsub"
 	"context"
 	"encoding/json"
 	"github.com/cloudevents/sdk-go/v2/event"
 	"github.com/stretchr/testify/assert"
-	"log"
 	"testing"
 	"time"
 )
 
 func TestReducer(t *testing.T) {
 	// Given
-	teardown, _ := SetupTest(t, "mapreduce-reducer-0")
+	teardown, subscriptions := SetupTest(t, []string{"mapreduce-controller"})
 	defer teardown(t)
 	teardownRedis := SetupRedisTest(t)
 	defer teardownRedis(t)
@@ -27,7 +27,7 @@ func TestReducer(t *testing.T) {
 	message := MessagePublishedData{
 		Message: PubSubMessage{
 			Data:       wordDataBytes,
-			Attributes: map[string]string{"splitter": "0", "noOfReducers": "1"},
+			Attributes: map[string]string{"reducerNum": "1"},
 		},
 	}
 
@@ -40,6 +40,7 @@ func TestReducer(t *testing.T) {
 	}
 
 	expectedResult := []string{"care", "race"}
+	expectedControllerResult := StatusMessage{Status: STATUS_FINISHED, ReducerNum: "1"}
 
 	// When
 	err = reducer(context.Background(), e)
@@ -49,7 +50,7 @@ func TestReducer(t *testing.T) {
 	conn := redisPool.Get()
 	defer conn.Close()
 
-	li, err := conn.Do("SMEMBERS", wordDataSlice[0].SortedWord)
+	li, err := conn.Do("SORT", wordDataSlice[0].SortedWord, "ALPHA")
 	if err != nil {
 		t.Fatalf("Error getting data from redis: %v", err)
 	}
@@ -58,58 +59,23 @@ func TestReducer(t *testing.T) {
 		actualResult = append(actualResult, string(v.([]byte)))
 	}
 	assert.Equal(t, expectedResult, actualResult)
-}
 
-func TestReducerEfficiency(t *testing.T) {
-	// Given
-	teardown, _ := SetupTest(t, "mapreduce-reducer-0")
-	defer teardown(t)
-	teardownRedis := SetupRedisTest(t)
-	defer teardownRedis(t)
-	var wordDataSlice []WordData
-	for i := 0; i < 10000; i++ {
-		wordDataSlice = append(wordDataSlice, WordData{Anagrams: map[string]struct{}{"quick": {}}, SortedWord: "cikqu"})
-	}
-	// Create a message
-	wordDataBytes, err := json.Marshal(wordDataSlice)
-	if err != nil {
-		t.Fatalf("Error marshalling word data: %v", err)
-	}
-	message := MessagePublishedData{
-		Message: PubSubMessage{
-			Data:       wordDataBytes,
-			Attributes: map[string]string{"splitter": "0", "noOfReducers": "1"},
-		},
-	}
-
-	// Create a CloudEvent to be sent to the shuffler
-	e := event.New()
-	e.SetDataContentType("application/json")
-	err = e.SetData(e.DataContentType(), message)
-	if err != nil {
-		t.Fatalf("Error setting event data: %v", err)
-	}
-
-	expectedResult := []string{"quick"}
-
-	// When
-	startTime := time.Now()
-	err = reducer(context.Background(), e)
-	elapsedTime := time.Since(startTime)
-	log.Printf("Shuffler took %s", elapsedTime)
-
-	// Then
+	// Ensure the controller received the correct message
+	// The subscription will listen forever unless given a context with a timeout
+	controllerCtx, controllerCancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer controllerCancel()
+	var received StatusMessage
+	err = subscriptions[0].Receive(controllerCtx, func(ctx context.Context, msg *pubsub.Message) {
+		// Unmarshal the message data into the WordData struct
+		err := json.Unmarshal(msg.Data, &received)
+		if err != nil {
+			t.Fatalf("Error unmarshalling message: %v", err)
+		}
+		msg.Ack()
+	})
+	// Ensure the message data matches the expected result
+	assert.Equal(t, expectedControllerResult.Status, received.Status)
+	assert.Equal(t, expectedControllerResult.ReducerNum, received.ReducerNum)
+	// Ensure there are no errors returned by the receiver
 	assert.Nil(t, err)
-	conn := redisPool.Get()
-	defer conn.Close()
-
-	li, err := conn.Do("SMEMBERS", wordDataSlice[0].SortedWord)
-	if err != nil {
-		t.Fatalf("Error getting data from redis: %v", err)
-	}
-	var actualResult []string
-	for _, v := range li.([]interface{}) {
-		actualResult = append(actualResult, string(v.([]byte)))
-	}
-	assert.Equal(t, expectedResult, actualResult)
 }

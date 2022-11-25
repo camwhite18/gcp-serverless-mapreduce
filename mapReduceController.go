@@ -57,8 +57,12 @@ func controller(ctx context.Context, e event.Event) error {
 			// Create a client for the controller topic
 			outputterTopic := client.Topic("mapreduce-outputter-" + statusMessage.ReducerNum)
 			defer outputterTopic.Stop()
-			SendPubSubMessage(ctx, nil, nil, statusMessage, nil)
+			attributes := make(map[string]string)
+			attributes["reducerNum"] = statusMessage.ReducerNum
+			SendPubSubMessage(ctx, nil, outputterTopic, nil, attributes)
 		}
 	}
+	//TODO: Test to check if the controller is working properly
+	//TODO: Check if the deployment is working properly
 	return nil
 }

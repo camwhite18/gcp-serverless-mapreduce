@@ -12,7 +12,7 @@ import (
 
 func TestSplitter(t *testing.T) {
 	// Setup test
-	teardown, subscription := SetupTest(t, "mapreduce-mapper")
+	teardown, subscriptions := SetupTest(t, []string{"mapreduce-mapper", "mapreduce-controller"})
 	defer teardown(t)
 	teardownTestStorage := createTestStorage(t)
 	defer teardownTestStorage(t)
@@ -20,7 +20,7 @@ func TestSplitter(t *testing.T) {
 	// Given
 	// Create a message
 	inputData := SplitterData{
-		BucketName: BUCKET_NAME,
+		BucketName: INPUT_BUCKET_NAME,
 		FileName:   "test.txt",
 	}
 	inputDataBytes, err := json.Marshal(inputData)
@@ -30,7 +30,7 @@ func TestSplitter(t *testing.T) {
 	message := MessagePublishedData{
 		Message: PubSubMessage{
 			Data:       inputDataBytes,
-			Attributes: map[string]string{"instanceId": "12345", "noOfMappers": "1", "noOfReducers": "1", "mapper": "0"},
+			Attributes: make(map[string]string),
 		},
 	}
 	// Create a CloudEvent to be sent to the mapper
@@ -42,6 +42,7 @@ func TestSplitter(t *testing.T) {
 	}
 
 	expectedResult := []string{"The", "quick", "brown", "fox", "jumps", "over", "the", "lazy", "dog."}
+	expectedControllerResult := StatusMessage{Status: STATUS_STARTED, ReducerNum: ""}
 
 	// When
 	err = splitter(context.Background(), e)
@@ -49,11 +50,12 @@ func TestSplitter(t *testing.T) {
 	// Then
 	// Ensure there are no errors returned
 	assert.Nil(t, err)
+	// Ensure the mapper received the correct data
 	// The subscription will listen forever unless given a context with a timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 	var actualResult []string
-	err = subscription.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
+	err = subscriptions[0].Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
 		// Unmarshal the message data into the WordData struct
 		err := json.Unmarshal(msg.Data, &actualResult)
 		if err != nil {
@@ -63,6 +65,25 @@ func TestSplitter(t *testing.T) {
 	})
 	// Ensure the message data matches the expected result
 	assert.Equal(t, expectedResult, actualResult)
+	// Ensure there are no errors returned by the receiver
+	assert.Nil(t, err)
+
+	// Ensure the controller received the correct message
+	// The subscription will listen forever unless given a context with a timeout
+	controllerCtx, controllerCancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer controllerCancel()
+	var received StatusMessage
+	err = subscriptions[1].Receive(controllerCtx, func(ctx context.Context, msg *pubsub.Message) {
+		// Unmarshal the message data into the WordData struct
+		err := json.Unmarshal(msg.Data, &received)
+		if err != nil {
+			t.Fatalf("Error unmarshalling message: %v", err)
+		}
+		msg.Ack()
+	})
+	// Ensure the message data matches the expected result
+	assert.Equal(t, expectedControllerResult.Status, received.Status)
+	assert.Equal(t, expectedControllerResult.ReducerNum, received.ReducerNum)
 	// Ensure there are no errors returned by the receiver
 	assert.Nil(t, err)
 }
