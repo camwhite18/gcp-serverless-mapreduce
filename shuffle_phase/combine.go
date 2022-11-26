@@ -1,9 +1,10 @@
-package serverless_mapreduce
+package shuffle_phase
 
 import (
 	"context"
 	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
 	"github.com/cloudevents/sdk-go/v2/event"
+	"gitlab.com/cameron_w20/serverless-mapreduce"
 )
 
 func init() {
@@ -11,8 +12,8 @@ func init() {
 }
 
 func combine(ctx context.Context, e event.Event) error {
-	var wordData []WordData
-	client, attributes, err := ReadPubSubMessage(ctx, e, &wordData)
+	var wordData []serverless_mapreduce.WordData
+	client, attributes, err := serverless_mapreduce.ReadPubSubMessage(ctx, e, &wordData)
 	if err != nil {
 		return err
 	}
@@ -31,10 +32,10 @@ func combine(ctx context.Context, e event.Event) error {
 		}
 	}
 	// Convert the map to a slice
-	combinedText := make([]WordData, 0)
+	combinedText := make([]serverless_mapreduce.WordData, 0)
 	for k, v := range combinedWordDataMap {
-		combinedText = append(combinedText, WordData{SortedWord: k, Anagrams: v})
+		combinedText = append(combinedText, serverless_mapreduce.WordData{SortedWord: k, Anagrams: v})
 	}
-	SendPubSubMessage(ctx, nil, client.Topic("mapreduce-shuffler"), combinedText, attributes)
+	serverless_mapreduce.SendPubSubMessage(ctx, nil, client.Topic("mapreduce-shuffler"), combinedText, attributes)
 	return nil
 }

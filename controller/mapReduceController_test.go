@@ -1,4 +1,4 @@
-package serverless_mapreduce
+package controller
 
 import (
 	"cloud.google.com/go/pubsub"
@@ -6,28 +6,28 @@ import (
 	"encoding/json"
 	"github.com/cloudevents/sdk-go/v2/event"
 	"github.com/stretchr/testify/assert"
+	sm "gitlab.com/cameron_w20/serverless-mapreduce"
 	"testing"
 	"time"
 )
 
 func TestMapReduceController_StatusStarted(t *testing.T) {
 	// Given
-	teardown, _ := SetupTest(t, []string{"mapreduce-outputter-0"})
+	teardown, _ := sm.SetupTest(t, []string{"mapreduce-outputter-0"})
 	defer teardown(t)
-	teardownRedis := SetupRedisTest(t)
+	teardownRedis := sm.SetupRedisTest(t)
 	defer teardownRedis(t)
-	statusMessage := StatusMessage{
-		Id:         "12345",
-		Status:     STATUS_STARTED,
-		ReducerNum: "",
+	statusMessage := sm.StatusMessage{
+		Id:     "12345",
+		Status: sm.STATUS_STARTED,
 	}
 	// Create a message
 	statusMessageBytes, err := json.Marshal(statusMessage)
 	if err != nil {
 		t.Fatalf("Error marshalling status message: %v", err)
 	}
-	message := MessagePublishedData{
-		Message: PubSubMessage{
+	message := sm.MessagePublishedData{
+		Message: sm.PubSubMessage{
 			Data: statusMessageBytes,
 		},
 	}
@@ -47,7 +47,7 @@ func TestMapReduceController_StatusStarted(t *testing.T) {
 
 	// Then
 	assert.Nil(t, err)
-	conn := controllerRedisPool.Get()
+	conn := sm.RedisPool.Get()
 	defer conn.Close()
 
 	li, err := conn.Do("SMEMBERS", "started-reducer-0")
@@ -63,22 +63,21 @@ func TestMapReduceController_StatusStarted(t *testing.T) {
 
 func TestMapReduceController_StatusFinished(t *testing.T) {
 	// Given
-	teardown, subscriptions := SetupTest(t, []string{"mapreduce-outputter"})
+	teardown, subscriptions := sm.SetupTest(t, []string{"mapreduce-outputter"})
 	defer teardown(t)
-	teardownRedis := SetupRedisTest(t)
+	teardownRedis := sm.SetupRedisTest(t)
 	defer teardownRedis(t)
-	statusMessage := StatusMessage{
-		Id:         "12345",
-		Status:     STATUS_FINISHED,
-		ReducerNum: "0",
+	statusMessage := sm.StatusMessage{
+		Id:     "12345",
+		Status: sm.STATUS_FINISHED,
 	}
 	// Create a message
 	statusMessageBytes, err := json.Marshal(statusMessage)
 	if err != nil {
 		t.Fatalf("Error marshalling status message: %v", err)
 	}
-	message := MessagePublishedData{
-		Message: PubSubMessage{
+	message := sm.MessagePublishedData{
+		Message: sm.PubSubMessage{
 			Data: statusMessageBytes,
 		},
 	}
@@ -91,7 +90,7 @@ func TestMapReduceController_StatusFinished(t *testing.T) {
 		t.Fatalf("Error setting event data: %v", err)
 	}
 
-	controllerRedisPool, err := initRedisPool()
+	controllerRedisPool, err := sm.InitRedisPool()
 	if err != nil {
 		t.Fatalf("Error initializing redis pool: %v", err)
 	}

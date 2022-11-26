@@ -1,4 +1,4 @@
-package serverless_mapreduce
+package shuffle_phase
 
 import (
 	"cloud.google.com/go/pubsub"
@@ -6,25 +6,26 @@ import (
 	"encoding/json"
 	"github.com/cloudevents/sdk-go/v2/event"
 	"github.com/stretchr/testify/assert"
+	"gitlab.com/cameron_w20/serverless-mapreduce"
 	"testing"
 	"time"
 )
 
 func TestShuffler(t *testing.T) {
 	// Setup test
-	teardown, subscriptions := SetupTest(t, []string{"mapreduce-reducer-1"})
+	teardown, subscriptions := serverless_mapreduce.SetupTest(t, []string{"mapreduce-reducer-1"})
 	defer teardown(t)
 	// Given
 	// Create a message
-	inputData := []WordData{
+	inputData := []serverless_mapreduce.WordData{
 		{SortedWord: "acer", Anagrams: map[string]struct{}{"care": {}, "race": {}}},
 	}
 	inputDataBytes, err := json.Marshal(inputData)
 	if err != nil {
 		t.Fatalf("Error marshalling shuffler data: %v", err)
 	}
-	message := MessagePublishedData{
-		Message: PubSubMessage{
+	message := serverless_mapreduce.MessagePublishedData{
+		Message: serverless_mapreduce.PubSubMessage{
 			Data:       inputDataBytes,
 			Attributes: make(map[string]string),
 		},
@@ -37,7 +38,7 @@ func TestShuffler(t *testing.T) {
 		t.Fatalf("Error setting event data: %v", err)
 	}
 
-	expectedResult := []WordData{
+	expectedResult := []serverless_mapreduce.WordData{
 		{SortedWord: "acer", Anagrams: map[string]struct{}{"care": {}, "race": {}}},
 	}
 
@@ -50,13 +51,14 @@ func TestShuffler(t *testing.T) {
 	// The subscription will listen forever unless given a context with a timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	var actualResult []WordData
+	var actualResult []serverless_mapreduce.WordData
 	err = subscriptions[0].Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
 		// Unmarshal the message data into the WordData struct
 		err := json.Unmarshal(msg.Data, &actualResult)
 		if err != nil {
 			t.Fatalf("Error unmarshalling message: %v", err)
 		}
+		assert.Equal(t, msg.Attributes["reducerNum"], "1")
 		msg.Ack()
 	})
 	// Ensure the message data matches the expected result

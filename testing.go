@@ -68,7 +68,7 @@ func SetupTest(tb testing.TB, topicIDs []string) (func(tb testing.TB), []*pubsub
 	}, subscriptions
 }
 
-func createTestStorage(tb testing.TB) func(tb testing.TB) {
+func CreateTestStorage(tb testing.TB) func(tb testing.TB) {
 	// Setup test
 	ctx := context.Background()
 	// Modify the STORAGE_EMULATOR_HOST environment variable to point to the storage emulator
@@ -167,7 +167,7 @@ func SetupRedisTest(tb testing.TB) func(tb testing.TB) {
 	redisPort := os.Getenv("REDIS_PORT")
 	redisAddress := fmt.Sprintf("%s:%s", redisHost, redisPort)
 	const maxConnections = 10
-	redisPool = &redis.Pool{
+	RedisPool = &redis.Pool{
 		MaxIdle: maxConnections,
 		Dial: func() (redis.Conn, error) {
 			return redis.Dial("tcp", redisAddress)
@@ -176,7 +176,7 @@ func SetupRedisTest(tb testing.TB) func(tb testing.TB) {
 
 	return func(tb testing.TB) {
 		// Teardown test
-		conn := redisPool.Get()
+		conn := RedisPool.Get()
 		defer conn.Close()
 		_, err := conn.Do("FLUSHALL")
 		if err != nil {

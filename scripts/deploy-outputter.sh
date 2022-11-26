@@ -19,27 +19,15 @@ else
 fi
 
 # Create the topics, redis instances and deploy the mappers
-num_reducers=5
-for ((i=0;i<num_reducers;i++)) do
+num_outputters=5
+for ((i=0;i<num_outputters;i++)) do
   ( \
-  echo "Creating topic mapreduce-reducer-$i"
-  if (gcloud pubsub topics create mapreduce-reducer-"$i" \
+  echo "Creating topic mapreduce-outputter-$i"
+  if (gcloud pubsub topics create mapreduce-outputter-"$i" \
       --project=serverless-mapreduce) ; then
-    echo "Successfully created topic mapreduce-reducer-$i"
+    echo "Successfully created topic mapreduce-outputter-$i"
   else
-    echo "Failed to create topic mapreduce-reducer-$i"
-    exit 1
-  fi
-
-  echo "Creating Redis instance mapreduce-reducer-$i"
-  if (gcloud redis instances create mapreduce-reducer-"$i" \
-      --tier=basic \
-      --region=europe-west2 \
-      --size=1 \
-      --network=default) ; then
-    echo "Successfully created Redis instance mapreduce-reducer-$i"
-  else
-    echo "Failed to create Redis instance mapreduce-reducer-$i"
+    echo "Failed to create topic mapreduce-outputter-$i"
     exit 1
   fi
 
@@ -50,27 +38,27 @@ for ((i=0;i<num_reducers;i++)) do
                 --region=europe-west2 \
                 --format="value(port)")
 
-  echo "Deploying reducer $i"
-  if (gcloud functions deploy reducer-"$i" \
+  echo "Deploying outputter $i"
+  if (gcloud functions deploy outputter-"$i" \
   		--gen2 \
   		--runtime=go116 \
-  		--trigger-topic mapreduce-reducer-"$i" \
+  		--trigger-topic mapreduce-outputter-"$i" \
   		--source=. \
-  		--entry-point Reducer \
+  		--entry-point Outputter \
   		--region=europe-west2 \
   		--memory=512MB \
       --project=serverless-mapreduce \
       --vpc-connector=projects/serverless-mapreduce/locations/europe-west2/connectors/mapreduce-connector \
       --set-env-vars=REDIS_HOST="$REDIS_HOST",REDIS_PORT="$REDIS_PORT"
       ) ; then
-    echo "Successfully deployed reducer $i"
+    echo "Successfully deployed outputter $i"
   else
-    echo "Failed to deploy reducer $i"
+    echo "Failed to deploy outputter $i"
     exit 1
   fi
 
   # Change the backoff delay of the subscription to start at 1 second
-  subscription=$(gcloud pubsub subscriptions list | grep "eventarc-europe-west2-reducer-$i" | cut -c 7-)
+  subscription=$(gcloud pubsub subscriptions list | grep "eventarc-europe-west2-outputter-$i" | cut -c 7-)
   echo "Changing backoff delay of subscription $subscription"
   gcloud pubsub subscriptions update "$subscription" \
     --project=serverless-mapreduce \

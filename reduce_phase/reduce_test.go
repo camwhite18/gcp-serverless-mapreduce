@@ -1,4 +1,4 @@
-package serverless_mapreduce
+package reduce_phase
 
 import (
 	"cloud.google.com/go/pubsub"
@@ -6,17 +6,18 @@ import (
 	"encoding/json"
 	"github.com/cloudevents/sdk-go/v2/event"
 	"github.com/stretchr/testify/assert"
+	sm "gitlab.com/cameron_w20/serverless-mapreduce"
 	"testing"
 	"time"
 )
 
 func TestReducer(t *testing.T) {
 	// Given
-	teardown, subscriptions := SetupTest(t, []string{"mapreduce-controller"})
+	teardown, subscriptions := sm.SetupTest(t, []string{"mapreduce-controller"})
 	defer teardown(t)
-	teardownRedis := SetupRedisTest(t)
+	teardownRedis := sm.SetupRedisTest(t)
 	defer teardownRedis(t)
-	wordDataSlice := []WordData{
+	wordDataSlice := []sm.WordData{
 		{SortedWord: "acer", Anagrams: map[string]struct{}{"care": {}, "race": {}}},
 	}
 	// Create a message
@@ -24,8 +25,8 @@ func TestReducer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error marshalling word data: %v", err)
 	}
-	message := MessagePublishedData{
-		Message: PubSubMessage{
+	message := sm.MessagePublishedData{
+		Message: sm.PubSubMessage{
 			Data:       wordDataBytes,
 			Attributes: map[string]string{"reducerNum": "1"},
 		},
@@ -40,14 +41,14 @@ func TestReducer(t *testing.T) {
 	}
 
 	expectedResult := []string{"care", "race"}
-	expectedControllerResult := StatusMessage{Status: STATUS_FINISHED, ReducerNum: "1"}
+	expectedControllerResult := sm.StatusMessage{Status: sm.STATUS_FINISHED}
 
 	// When
 	err = reducer(context.Background(), e)
 
 	// Then
 	assert.Nil(t, err)
-	conn := redisPool.Get()
+	conn := sm.RedisPool.Get()
 	defer conn.Close()
 
 	li, err := conn.Do("SORT", wordDataSlice[0].SortedWord, "ALPHA")
@@ -64,18 +65,18 @@ func TestReducer(t *testing.T) {
 	// The subscription will listen forever unless given a context with a timeout
 	controllerCtx, controllerCancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer controllerCancel()
-	var received StatusMessage
+	var received sm.StatusMessage
 	err = subscriptions[0].Receive(controllerCtx, func(ctx context.Context, msg *pubsub.Message) {
 		// Unmarshal the message data into the WordData struct
 		err := json.Unmarshal(msg.Data, &received)
 		if err != nil {
 			t.Fatalf("Error unmarshalling message: %v", err)
 		}
+		assert.Equal(t, msg.Attributes["reducerNum"], "1")
 		msg.Ack()
 	})
 	// Ensure the message data matches the expected result
 	assert.Equal(t, expectedControllerResult.Status, received.Status)
-	assert.Equal(t, expectedControllerResult.ReducerNum, received.ReducerNum)
 	// Ensure there are no errors returned by the receiver
 	assert.Nil(t, err)
 }

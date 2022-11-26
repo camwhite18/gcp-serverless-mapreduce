@@ -1,34 +1,38 @@
-package serverless_mapreduce
+package map_phase
 
 import (
 	"cloud.google.com/go/pubsub"
 	"context"
 	"encoding/json"
 	"github.com/cloudevents/sdk-go/v2/event"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"gitlab.com/cameron_w20/serverless-mapreduce"
+	"log"
+	"sync"
 	"testing"
 	"time"
 )
 
 func TestSplitter(t *testing.T) {
 	// Setup test
-	teardown, subscriptions := SetupTest(t, []string{"mapreduce-mapper", "mapreduce-controller"})
+	teardown, subscriptions := serverless_mapreduce.SetupTest(t, []string{"mapreduce-mapper", "mapreduce-controller"})
 	defer teardown(t)
-	teardownTestStorage := createTestStorage(t)
+	teardownTestStorage := serverless_mapreduce.CreateTestStorage(t)
 	defer teardownTestStorage(t)
 
 	// Given
 	// Create a message
-	inputData := SplitterData{
-		BucketName: INPUT_BUCKET_NAME,
+	inputData := serverless_mapreduce.SplitterData{
+		BucketName: serverless_mapreduce.INPUT_BUCKET_NAME,
 		FileName:   "test.txt",
 	}
 	inputDataBytes, err := json.Marshal(inputData)
 	if err != nil {
 		t.Fatalf("Error marshalling splitter data: %v", err)
 	}
-	message := MessagePublishedData{
-		Message: PubSubMessage{
+	message := serverless_mapreduce.MessagePublishedData{
+		Message: serverless_mapreduce.PubSubMessage{
 			Data:       inputDataBytes,
 			Attributes: make(map[string]string),
 		},
@@ -42,7 +46,7 @@ func TestSplitter(t *testing.T) {
 	}
 
 	expectedResult := []string{"The", "quick", "brown", "fox", "jumps", "over", "the", "lazy", "dog."}
-	expectedControllerResult := StatusMessage{Status: STATUS_STARTED, ReducerNum: ""}
+	expectedControllerResult := serverless_mapreduce.StatusMessage{Status: serverless_mapreduce.STATUS_STARTED}
 
 	// When
 	err = splitter(context.Background(), e)
@@ -72,7 +76,7 @@ func TestSplitter(t *testing.T) {
 	// The subscription will listen forever unless given a context with a timeout
 	controllerCtx, controllerCancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer controllerCancel()
-	var received StatusMessage
+	var received serverless_mapreduce.StatusMessage
 	err = subscriptions[1].Receive(controllerCtx, func(ctx context.Context, msg *pubsub.Message) {
 		// Unmarshal the message data into the WordData struct
 		err := json.Unmarshal(msg.Data, &received)
@@ -83,7 +87,6 @@ func TestSplitter(t *testing.T) {
 	})
 	// Ensure the message data matches the expected result
 	assert.Equal(t, expectedControllerResult.Status, received.Status)
-	assert.Equal(t, expectedControllerResult.ReducerNum, received.ReducerNum)
 	// Ensure there are no errors returned by the receiver
 	assert.Nil(t, err)
 }
@@ -100,4 +103,23 @@ func TestRemoveBookHeaderAndFooter(t *testing.T) {
 
 	// Then
 	assert.Equal(t, expectedResult, actualResult)
+}
+
+func TestT(t *testing.T) {
+	m := make(map[string]string)
+	var wg sync.WaitGroup
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			a := make(map[string]string)
+			for k, v := range m {
+				a[k] = v
+			}
+			a["id"] = uuid.New().String()
+			time.Sleep(1 * time.Second)
+			log.Println(a["id"])
+			wg.Done()
+		}()
+	}
+	wg.Wait()
 }

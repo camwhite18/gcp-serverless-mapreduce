@@ -1,9 +1,10 @@
-package serverless_mapreduce
+package map_phase
 
 import (
 	"context"
 	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
 	"github.com/cloudevents/sdk-go/v2/event"
+	"gitlab.com/cameron_w20/serverless-mapreduce"
 	"log"
 	"sort"
 	"strings"
@@ -18,12 +19,12 @@ func init() {
 func mapper(ctx context.Context, e event.Event) error {
 	start := time.Now()
 	var text []string
-	client, attributes, err := ReadPubSubMessage(ctx, e, &text)
+	client, attributes, err := serverless_mapreduce.ReadPubSubMessage(ctx, e, &text)
 	if err != nil {
 		return err
 	}
 	defer client.Close()
-	var mappedText []WordData
+	var mappedText []serverless_mapreduce.WordData
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	for _, word := range text {
@@ -34,12 +35,12 @@ func mapper(ctx context.Context, e event.Event) error {
 	topic := client.Topic("mapreduce-combine")
 	defer topic.Stop()
 	// Send one pubsub message to the combiner per book to reduce the number of invocations -> reduce cost
-	SendPubSubMessage(ctx, nil, topic, mappedText, attributes)
+	serverless_mapreduce.SendPubSubMessage(ctx, nil, topic, mappedText, attributes)
 	log.Printf("Mapper took %v to run", time.Since(start))
 	return nil
 }
 
-func mapWord(wg *sync.WaitGroup, mu *sync.Mutex, mappedText *[]WordData, word string) {
+func mapWord(wg *sync.WaitGroup, mu *sync.Mutex, mappedText *[]serverless_mapreduce.WordData, word string) {
 	defer wg.Done()
 	// Do some preprocessing on the word
 	preProcessedWord := preProcessWord(word)
@@ -53,7 +54,7 @@ func mapWord(wg *sync.WaitGroup, mu *sync.Mutex, mappedText *[]WordData, word st
 	anagrams := make(map[string]struct{})
 	anagrams[preProcessedWord] = struct{}{}
 	mu.Lock()
-	*mappedText = append(*mappedText, WordData{SortedWord: sortedWord, Anagrams: anagrams})
+	*mappedText = append(*mappedText, serverless_mapreduce.WordData{SortedWord: sortedWord, Anagrams: anagrams})
 	mu.Unlock()
 }
 
@@ -90,7 +91,7 @@ func preProcessWord(word string) string {
 	// Remove punctuation
 	word = strings.Trim(word, ".,;:!?\" ")
 	// Remove the word if it is a stopword or contains numbers or symbols
-	if _, ok := stopwords[word]; ok || strings.ContainsAny(word, "0123456789*+-_&^%$#@!~`|}{[]\\:;\"'<>,.?/") {
+	if _, ok := stopwords[word]; ok || strings.ContainsAny(word, "0123456789*+-_&^%$#@!~`|}{[]\\:;\"'<>,.?/()") {
 		return ""
 	}
 	return word

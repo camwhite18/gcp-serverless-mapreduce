@@ -1,4 +1,4 @@
-package serverless_mapreduce
+package init
 
 import (
 	"cloud.google.com/go/pubsub"
@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
+	sm "gitlab.com/cameron_w20/serverless-mapreduce"
 	"google.golang.org/api/iterator"
 	"log"
 	"net/http"
@@ -17,16 +18,31 @@ func init() {
 	functions.HTTP("StartMapreduce", startMapreduce)
 }
 
+// Response is the response object sent to the client
 type Response struct {
 	ResponseCode int    `json:"responseCode"`
 	Message      string `json:"message"`
 }
 
+// startMapreduce is a function triggered by an HTTP request which starts the MapReduce process. It reads all the file
+// names in the input bucket and pushes them to the splitter topic. The function requires two query parameters:
+// input-bucket: the name of the bucket containing the input files
+// output-bucket: the name of the bucket where the output files will be stored
 func startMapreduce(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	// Get the query parameters
-	bucketName := r.URL.Query().Get("bucket")
-	files, err := readFileNamesInBucket(bucketName)
+	inputBucketName := r.URL.Query().Get("input-bucket")
+	if inputBucketName == "" {
+		writeResponse(w, http.StatusBadRequest, "No input bucket name provided")
+		return
+	}
+	outputBucketName := r.URL.Query().Get("output-bucket")
+	if outputBucketName == "" {
+		writeResponse(w, http.StatusBadRequest, "No output bucket name provided")
+		return
+	}
+	// Read the file names in the input bucket
+	files, err := readFileNamesInBucket(inputBucketName)
 	if err != nil {
 		writeResponse(w, http.StatusInternalServerError, err.Error())
 		return
@@ -43,22 +59,25 @@ func startMapreduce(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer client.Close()
-	// Set the topic the client will publish to
-	topic := client.Topic("mapreduce-splitter")
-	// Send the slices to the splitter instances
+	// Create a client for the splitter topic
+	topic := client.Topic(sm.SPLITTER_TOPIC)
+	// Push each file name to the splitter topic
+	// Use a wait group so we can wait for all the messages to be sent before returning
 	var wg sync.WaitGroup
 	for _, file := range files {
-		splitterData := SplitterData{
-			BucketName: bucketName,
+		splitterData := sm.SplitterData{
+			BucketName: inputBucketName,
 			FileName:   file,
 		}
 		wg.Add(1)
-		go SendPubSubMessage(ctx, &wg, topic, splitterData, make(map[string]string))
+		// Use a goroutine to send the messages concurrently -> this is faster than sending them sequentially
+		go sm.SendPubSubMessage(ctx, &wg, topic, splitterData, map[string]string{"outputBucket": outputBucketName})
 	}
 	wg.Wait()
-	writeResponse(w, http.StatusOK, "MapReduce started successfully")
+	writeResponse(w, http.StatusOK, "MapReduce started successfully - results will be stored in: "+outputBucketName)
 }
 
+// readFileNamesInBucket reads the file names in the input bucket and returns them as a slice of strings
 func readFileNamesInBucket(bucketName string) ([]string, error) {
 	// Create a new storage client
 	ctx := context.Background()
@@ -67,10 +86,10 @@ func readFileNamesInBucket(bucketName string) ([]string, error) {
 		return nil, err
 	}
 	defer client.Close()
-
+	// Create a 10-second timeout context so we don't wait forever if there is an error
 	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
-	// Iterate over all objects in the bucket
+	// Iterate over all objects in the bucket and add each file name to the files slice
 	objects := client.Bucket(bucketName).Objects(ctx, nil)
 	files := make([]string, 0)
 	for {
@@ -87,17 +106,21 @@ func readFileNamesInBucket(bucketName string) ([]string, error) {
 	return files, nil
 }
 
+// writeResponse writes the response to the client
 func writeResponse(w http.ResponseWriter, code int, message string) {
+	// Create a response object
 	responseMsg := Response{
 		ResponseCode: code,
 		Message:      message,
 	}
+	// Convert the response object to JSON
 	responseMsgBytes, err := json.Marshal(responseMsg)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
 	}
+	// Write the response
 	w.WriteHeader(code)
-	w.Write(responseMsgBytes)
+	_, _ = w.Write(responseMsgBytes)
 }

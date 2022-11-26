@@ -1,10 +1,11 @@
-package serverless_mapreduce
+package init
 
 import (
 	"cloud.google.com/go/pubsub"
 	"context"
 	"encoding/json"
 	"github.com/stretchr/testify/assert"
+	"gitlab.com/cameron_w20/serverless-mapreduce"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -12,18 +13,18 @@ import (
 )
 
 func TestStartMapReduce(t *testing.T) {
-	teardown, subscriptions := SetupTest(t, []string{"mapreduce-splitter"})
+	teardown, subscriptions := serverless_mapreduce.SetupTest(t, []string{"mapreduce-splitter"})
 	defer teardown(t)
-	teardownTestStorage := createTestStorage(t)
+	teardownTestStorage := serverless_mapreduce.CreateTestStorage(t)
 	defer teardownTestStorage(t)
 
 	// Given
-	req := httptest.NewRequest(http.MethodGet, "https://someurl.com?mappers=1&bucket="+INPUT_BUCKET_NAME, nil)
+	req := httptest.NewRequest(http.MethodGet, "https://someurl.com?bucket="+serverless_mapreduce.INPUT_BUCKET_NAME, nil)
 	rec := httptest.NewRecorder()
 
 	expectedResponse := `{"responseCode":200,"message":"MapReduce started successfully"}`
-	expectedResult := SplitterData{
-		BucketName: INPUT_BUCKET_NAME,
+	expectedResult := serverless_mapreduce.SplitterData{
+		BucketName: serverless_mapreduce.INPUT_BUCKET_NAME,
 		FileName:   "test.txt",
 	}
 
@@ -36,7 +37,7 @@ func TestStartMapReduce(t *testing.T) {
 	// The subscription will listen forever unless given a context with a timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	var actualResult SplitterData
+	var actualResult serverless_mapreduce.SplitterData
 	err := subscriptions[0].Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
 		// Ensure the message data matches the expected result
 		err := json.Unmarshal(msg.Data, &actualResult)

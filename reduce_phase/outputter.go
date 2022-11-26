@@ -1,4 +1,4 @@
-package serverless_mapreduce
+package reduce_phase
 
 import (
 	"cloud.google.com/go/storage"
@@ -7,7 +7,10 @@ import (
 	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
 	"github.com/cloudevents/sdk-go/v2/event"
 	"github.com/gomodule/redigo/redis"
+	sm "gitlab.com/cameron_w20/serverless-mapreduce"
+	"log"
 	"strings"
+	"time"
 )
 
 func init() {
@@ -15,16 +18,26 @@ func init() {
 }
 
 func outputResult(ctx context.Context, e event.Event) error {
-	_, attributes, err := ReadPubSubMessage(ctx, e, nil)
+	start := time.Now()
+	_, attributes, err := sm.ReadPubSubMessage(ctx, e, nil)
 	if err != nil {
 		return err
 	}
 	// Get the reducer number and output bucket from the attributes
 	reducerNum := attributes["reducerNum"]
 	outputBucket := attributes["outputBucket"]
+	log.Printf("reducer %s is outputting to bucket %s", reducerNum, outputBucket)
 
+	// Initialize the redis pool if it hasn't been initialized yet
+	if sm.RedisPool == nil {
+		var err error
+		sm.RedisPool, err = sm.InitRedisPool()
+		if err != nil {
+			return fmt.Errorf("error initializing redis pool: %v", err)
+		}
+	}
 	// Connect to the redis instance for that reducer and get all the anagrams
-	conn := redisPool.Get()
+	conn := sm.RedisPool.Get()
 	defer conn.Close()
 	// Get all the keys in the redis instance
 	keys, err := redis.Strings(conn.Do("KEYS", "*"))
@@ -37,7 +50,7 @@ func outputResult(ctx context.Context, e event.Event) error {
 		return fmt.Errorf("error creating storage client: %v", err)
 	}
 	defer client.Close()
-	writer := client.Bucket(outputBucket).Object("reducer-" + reducerNum + "-output.txt").NewWriter(ctx)
+	writer := client.Bucket(outputBucket).Object("result-part-" + reducerNum + ".txt").NewWriter(ctx)
 	defer writer.Close()
 	// Write the anagrams to a file in the output bucket
 	for _, key := range keys {
@@ -53,5 +66,11 @@ func outputResult(ctx context.Context, e event.Event) error {
 			}
 		}
 	}
+	// Delete the data from the redis instance
+	_, err = conn.Do("FLUSHALL")
+	if err != nil {
+		return fmt.Errorf("error flushing redis: %v", err)
+	}
+	log.Printf("outputter took %v", time.Since(start))
 	return nil
 }

@@ -4,7 +4,7 @@ services:
   shuffler-cloud-run:
     build:
       context: .
-      dockerfile: shuffle/Dockerfile
+      dockerfile: controller/Dockerfile
   pubsub-emulator:
     image: gcr.io/google.com/cloudsdktool/cloud-sdk:latest
     ports:

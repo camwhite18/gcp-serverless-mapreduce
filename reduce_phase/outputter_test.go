@@ -1,10 +1,11 @@
-package serverless_mapreduce
+package reduce_phase
 
 import (
 	"cloud.google.com/go/storage"
 	"context"
 	"github.com/cloudevents/sdk-go/v2/event"
 	"github.com/stretchr/testify/assert"
+	sm "gitlab.com/cameron_w20/serverless-mapreduce"
 	"io"
 	"testing"
 	"time"
@@ -12,17 +13,17 @@ import (
 
 func TestOutputResult(t *testing.T) {
 	// Setup test
-	teardown, _ := SetupTest(t, []string{})
+	teardown, _ := sm.SetupTest(t, []string{})
 	defer teardown(t)
-	teardownStorage := createTestStorage(t)
+	teardownStorage := sm.CreateTestStorage(t)
 	defer teardownStorage(t)
-	teardownRedis := SetupRedisTest(t)
+	teardownRedis := sm.SetupRedisTest(t)
 	defer teardownRedis(t)
 	// Given
 	// Create a message
-	message := MessagePublishedData{
-		Message: PubSubMessage{
-			Attributes: map[string]string{"reducerNum": "1", "outputBucket": OUTPUT_BUCKET_NAME},
+	message := sm.MessagePublishedData{
+		Message: sm.PubSubMessage{
+			Attributes: map[string]string{"reducerNum": "1", "outputBucket": sm.OUTPUT_BUCKET_NAME},
 		},
 	}
 	// Create a CloudEvent to be sent to the mapper
@@ -34,7 +35,7 @@ func TestOutputResult(t *testing.T) {
 	}
 
 	// Add data to redis
-	conn := redisPool.Get()
+	conn := sm.RedisPool.Get()
 	defer conn.Close()
 	_, err = conn.Do("SADD", "acer", "race")
 	if err != nil {
@@ -60,7 +61,7 @@ func TestOutputResult(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error creating storage client: %v", err)
 	}
-	outputBucket := client.Bucket(OUTPUT_BUCKET_NAME)
+	outputBucket := client.Bucket(sm.OUTPUT_BUCKET_NAME)
 	// Create a reader to read the file
 	reader, err := outputBucket.Object("reducer-1-output.txt").NewReader(storageCtx)
 	if err != nil {

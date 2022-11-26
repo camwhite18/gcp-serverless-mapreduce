@@ -1,4 +1,4 @@
-package serverless_mapreduce
+package shuffle_phase
 
 import (
 	"cloud.google.com/go/pubsub"
@@ -6,17 +6,18 @@ import (
 	"encoding/json"
 	"github.com/cloudevents/sdk-go/v2/event"
 	"github.com/stretchr/testify/assert"
+	"gitlab.com/cameron_w20/serverless-mapreduce"
 	"testing"
 	"time"
 )
 
 func TestCombine(t *testing.T) {
 	// Setup test
-	teardown, subscriptions := SetupTest(t, []string{"mapreduce-shuffler"})
+	teardown, subscriptions := serverless_mapreduce.SetupTest(t, []string{"mapreduce-shuffler"})
 	defer teardown(t)
 	// Given
 	// Create a message
-	inputData := []WordData{
+	inputData := []serverless_mapreduce.WordData{
 		{Anagrams: map[string]struct{}{"care": {}}, SortedWord: "acer"},
 		{Anagrams: map[string]struct{}{"part": {}}, SortedWord: "artp"},
 		{Anagrams: map[string]struct{}{"race": {}}, SortedWord: "acer"},
@@ -27,8 +28,8 @@ func TestCombine(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error marshalling mapper data: %v", err)
 	}
-	message := MessagePublishedData{
-		Message: PubSubMessage{
+	message := serverless_mapreduce.MessagePublishedData{
+		Message: serverless_mapreduce.PubSubMessage{
 			Data:       inputDataBytes,
 			Attributes: make(map[string]string),
 		},
@@ -41,7 +42,7 @@ func TestCombine(t *testing.T) {
 		t.Fatalf("Error setting event data: %v", err)
 	}
 
-	expectedResult := []WordData{
+	expectedResult := []serverless_mapreduce.WordData{
 		{SortedWord: "acer", Anagrams: map[string]struct{}{"care": {}, "race": {}}},
 		{SortedWord: "artp", Anagrams: map[string]struct{}{"part": {}, "trap": {}}},
 	}
@@ -55,7 +56,7 @@ func TestCombine(t *testing.T) {
 	// The subscription will listen forever unless given a context with a timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	var actualResult []WordData
+	var actualResult []serverless_mapreduce.WordData
 	err = subscriptions[0].Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
 		// Unmarshal the message data into the WordData struct
 		err := json.Unmarshal(msg.Data, &actualResult)
