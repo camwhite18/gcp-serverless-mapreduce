@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/cloudevents/sdk-go/v2/event"
+	"github.com/gomodule/redigo/redis"
 	"log"
+	"os"
 	"sync"
 )
 
@@ -46,4 +48,24 @@ func SendPubSubMessage(ctx context.Context, wg *sync.WaitGroup, topic *pubsub.To
 	if err != nil {
 		log.Printf("Error publishing message: %v", err)
 	}
+}
+
+func InitRedisPool() (*redis.Pool, error) {
+	redisHost := os.Getenv("REDIS_HOST")
+	if redisHost == "" {
+		return nil, fmt.Errorf("REDIS_HOST not set")
+	}
+	redisPort := os.Getenv("REDIS_PORT")
+	if redisPort == "" {
+		return nil, fmt.Errorf("REDIS_PORT not set")
+	}
+	redisAddress := fmt.Sprintf("%s:%s", redisHost, redisPort)
+
+	const maxConnections = 10
+	return &redis.Pool{
+		MaxIdle: maxConnections,
+		Dial: func() (redis.Conn, error) {
+			return redis.Dial("tcp", redisAddress)
+		},
+	}, nil
 }
