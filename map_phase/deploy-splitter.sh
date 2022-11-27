@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Check if gcloud is installed
 if ! [ -x "$(command -v gcloud)" ]; then

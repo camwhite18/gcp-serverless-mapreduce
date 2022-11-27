@@ -33,12 +33,12 @@ remove-api-gateway:
 		--project=$(GCP_PROJECT)
 
 deploy-controller:
-	./scripts/deploy-controller.sh
+	./controller/deploy-controller.sh
 
 remove-controller:
-	./scripts/remove-controller.sh
+	./controller/delete-controller.sh
 
-deploy-start-mapreduce:
+deploy-init-mapreduce:
 	@gcloud functions deploy init-mapreduce \
 		--gen2 \
 		--runtime=go116 \
@@ -49,8 +49,8 @@ deploy-start-mapreduce:
 		--memory=512MB \
 		--project=$(GCP_PROJECT)
 
-remove-start-mapreduce:
-	@gcloud functions delete init --region=$(GCP_REGION) --project=$(GCP_PROJECT) --gen2
+remove-init-mapreduce:
+	@gcloud functions delete init-mapreduce --region=$(GCP_REGION) --project=$(GCP_PROJECT) --gen2
 
 deploy-splitter:
 	./map_phase/deploy-splitter.sh
@@ -83,13 +83,13 @@ remove-reducer:
 	./reduce_phase/delete-reducers.sh
 
 deploy-outputter:
-	./reduce_phase/deploy-outputter.sh
+	./reduce_phase/deploy-outputters.sh
 
 remove-outputter:
-	./reduce_phase/delete-outputter.sh
+	./reduce_phase/delete-outputters.sh
 
 deploy: deploy-controller \
-		deploy-start-mapreduce \
+		deploy-init-mapreduce \
 		deploy-splitter \
 		deploy-mapper \
 		deploy-combine \
@@ -98,7 +98,7 @@ deploy: deploy-controller \
 		deploy-outputter
 
 remove: remove-controller \
-		remove-start-mapreduce \
+		remove-init-mapreduce \
 		remove-splitter \
 		remove-mapper \
 		remove-combine \

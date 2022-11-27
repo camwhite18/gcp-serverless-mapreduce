@@ -7,14 +7,13 @@ import (
 	"github.com/cloudevents/sdk-go/v2/event"
 	"github.com/stretchr/testify/assert"
 	"gitlab.com/cameron_w20/serverless-mapreduce/tools"
-	"log"
 	"testing"
 	"time"
 )
 
 func TestMapper(t *testing.T) {
 	// Setup test
-	teardown, subscriptions := tools.SetupTest(t, []string{"mapreduce-combine"})
+	teardown, subscriptions := tools.SetupTest(t, []string{tools.COMBINE_TOPIC})
 	defer teardown(t)
 	// Given
 	// Create a message
@@ -103,63 +102,4 @@ func TestProcessTextStopWord(t *testing.T) {
 
 	// Then
 	assert.Equal(t, expectedResult, actualResult)
-}
-
-func TestMapperPerformance(t *testing.T) {
-	// Setup test
-	teardown, subscriptions := tools.SetupTest(t, []string{"mapreduce-combine"})
-	defer teardown(t)
-	// Given
-	// Create a message
-	var inputData []string
-	for i := 0; i < 100000; i++ {
-		inputData = append(inputData, "quick")
-	}
-	inputDataBytes, err := json.Marshal(inputData)
-	if err != nil {
-		t.Fatalf("Error marshalling Mapper data: %v", err)
-	}
-	message := tools.MessagePublishedData{
-		Message: tools.PubSubMessage{
-			Data:       inputDataBytes,
-			Attributes: make(map[string]string),
-		},
-	}
-	// Create a CloudEvent to be sent to the Mapper
-	e := event.New()
-	e.SetDataContentType("application/json")
-	err = e.SetData(e.DataContentType(), message)
-	if err != nil {
-		t.Fatalf("Error setting event data: %v", err)
-	}
-
-	var expectedResult []tools.WordData
-	for i := 0; i < 100000; i++ {
-		expectedResult = append(expectedResult, tools.WordData{Anagrams: map[string]struct{}{"quick": {}}, SortedWord: "cikqu"})
-	}
-
-	// When
-	start := time.Now()
-	err = Mapper(context.Background(), e)
-	log.Printf("Mapper took %v", time.Since(start))
-
-	// Then
-	// Ensure there are no errors returned
-	assert.Nil(t, err)
-	// The subscription will listen forever unless given a context with a timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	defer cancel()
-	var actualResult []tools.WordData
-	err = subscriptions[0].Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
-		// Unmarshal the message data into the WordData struct
-		err := json.Unmarshal(msg.Data, &actualResult)
-		if err != nil {
-			t.Fatalf("Error unmarshalling message: %v", err)
-		}
-		msg.Ack()
-	})
-	// Ensure the message data matches the expected result
-	assert.Equal(t, expectedResult, actualResult)
-	// Ensure there are no errors returned by the receiver
-	assert.Nil(t, err)
 }

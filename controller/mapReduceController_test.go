@@ -13,7 +13,7 @@ import (
 
 func TestMapReduceController_StatusStarted(t *testing.T) {
 	// Given
-	teardown, _ := tools.SetupTest(t, []string{"mapreduce-outputter-0"})
+	teardown, _ := tools.SetupTest(t, []string{tools.OUTPUTTER_TOPIC + "-0"})
 	defer teardown(t)
 	teardownRedis := tools.SetupRedisTest(t)
 	defer teardownRedis(t)
@@ -63,7 +63,7 @@ func TestMapReduceController_StatusStarted(t *testing.T) {
 
 func TestMapReduceController_StatusFinished(t *testing.T) {
 	// Given
-	teardown, subscriptions := tools.SetupTest(t, []string{"mapreduce-outputter-0"})
+	teardown, subscriptions := tools.SetupTest(t, []string{tools.OUTPUTTER_TOPIC + "-0"})
 	defer teardown(t)
 	teardownRedis := tools.SetupRedisTest(t)
 	defer teardownRedis(t)

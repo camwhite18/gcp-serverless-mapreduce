@@ -13,7 +13,7 @@ import (
 
 func TestCombine(t *testing.T) {
 	// Setup test
-	teardown, subscriptions := tools.SetupTest(t, []string{"mapreduce-Shuffler"})
+	teardown, subscriptions := tools.SetupTest(t, []string{tools.SHUFFLER_TOPIC})
 	defer teardown(t)
 	// Given
 	// Create a message

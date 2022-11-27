@@ -19,10 +19,11 @@ func TestStartMapReduce(t *testing.T) {
 	defer teardownTestStorage(t)
 
 	// Given
-	req := httptest.NewRequest(http.MethodGet, "https://someurl.com?bucket="+tools.INPUT_BUCKET_NAME, nil)
+	req := httptest.NewRequest(http.MethodGet, "https://someurl.com?input-bucket="+tools.INPUT_BUCKET_NAME+
+		"&output-bucket="+tools.OUTPUT_BUCKET_NAME, nil)
 	rec := httptest.NewRecorder()
 
-	expectedResponse := `{"responseCode":200,"message":"MapReduce started successfully"}`
+	expectedResponse := `{"responseCode":200,"message":"MapReduce started successfully - results will be stored in: test-bucket-output"}`
 	expectedResult := tools.SplitterData{
 		BucketName: tools.INPUT_BUCKET_NAME,
 		FileName:   "test.txt",

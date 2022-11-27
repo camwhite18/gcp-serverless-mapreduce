@@ -13,7 +13,7 @@ import (
 
 func TestReducer(t *testing.T) {
 	// Given
-	teardown, subscriptions := tools.SetupTest(t, []string{"mapreduce-controller"})
+	teardown, subscriptions := tools.SetupTest(t, []string{tools.CONTROLLER_TOPIC})
 	defer teardown(t)
 	teardownRedis := tools.SetupRedisTest(t)
 	defer teardownRedis(t)

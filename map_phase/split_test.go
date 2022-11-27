@@ -5,18 +5,15 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/cloudevents/sdk-go/v2/event"
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"gitlab.com/cameron_w20/serverless-mapreduce/tools"
-	"log"
-	"sync"
 	"testing"
 	"time"
 )
 
 func TestSplitter(t *testing.T) {
 	// Setup test
-	teardown, subscriptions := tools.SetupTest(t, []string{"mapreduce-Mapper", "mapreduce-controller"})
+	teardown, subscriptions := tools.SetupTest(t, []string{tools.MAPPER_TOPIC, tools.CONTROLLER_TOPIC})
 	defer teardown(t)
 	teardownTestStorage := tools.CreateTestStorage(t)
 	defer teardownTestStorage(t)
@@ -103,23 +100,4 @@ func TestRemoveBookHeaderAndFooter(t *testing.T) {
 
 	// Then
 	assert.Equal(t, expectedResult, actualResult)
-}
-
-func TestT(t *testing.T) {
-	m := make(map[string]string)
-	var wg sync.WaitGroup
-	for i := 0; i < 10; i++ {
-		wg.Add(1)
-		go func() {
-			a := make(map[string]string)
-			for k, v := range m {
-				a[k] = v
-			}
-			a["id"] = uuid.New().String()
-			time.Sleep(1 * time.Second)
-			log.Println(a["id"])
-			wg.Done()
-		}()
-	}
-	wg.Wait()
 }
