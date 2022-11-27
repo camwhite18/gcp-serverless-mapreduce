@@ -39,52 +39,72 @@ remove-controller:
 	./scripts/remove-controller.sh
 
 deploy-start-mapreduce:
-	@gcloud functions deploy start-mapreduce \
+	@gcloud functions deploy init-mapreduce \
 		--gen2 \
 		--runtime=go116 \
 		--trigger-http \
 		--source=. \
-		--entry-point StartMapreduce \
+		--entry-point Service \
 		--region=$(GCP_REGION) \
 		--memory=512MB \
 		--project=$(GCP_PROJECT)
 
 remove-start-mapreduce:
-	@gcloud functions delete start-mapreduce --region=$(GCP_REGION) --project=$(GCP_PROJECT) --gen2
+	@gcloud functions delete init --region=$(GCP_REGION) --project=$(GCP_PROJECT) --gen2
 
 deploy-splitter:
-	./scripts/deploy-splitter.sh
+	./map_phase/deploy-splitter.sh
 
 remove-splitter:
-	./scripts/delete-splitter.sh
+	./map_phase/delete-splitter.sh
 
 deploy-mapper:
-	./scripts/deploy-mapper.sh
+	./map_phase/deploy-mapper.sh
 
 remove-mapper:
-	./scripts/delete-mapper.sh
+	./map_phase/delete-mapper.sh
 
 deploy-combine:
-	./scripts/deploy-combine.sh
+	./shuffle_phase/deploy-combine.sh
 
 remove-combine:
-	./scripts/delete-combine.sh
+	./shuffle_phase/delete-combine.sh
 
 deploy-shuffler:
-	./scripts/deploy-shuffler.sh
+	./shuffle_phase/deploy-shuffler.sh
 
 remove-shuffler:
-	./scripts/delete-shuffler.sh
+	./shuffle_phase/delete-shuffler.sh
 
 deploy-reducer:
-	./scripts/deploy-reducers.sh
+	./reduce_phase/deploy-reducers.sh
 
 remove-reducer:
-	./scripts/delete-reducers.sh
+	./reduce_phase/delete-reducers.sh
 
-deploy: create-input-bucket create-output-bucket deploy-controller deploy-start-mapreduce deploy-splitter deploy-mapper  deploy-combine deploy-shuffler deploy-reducer
+deploy-outputter:
+	./reduce_phase/deploy-outputter.sh
 
-remove: remove-controller remove-start-mapreduce remove-splitter remove-mapper remove-combine remove-shuffler remove-reducer
+remove-outputter:
+	./reduce_phase/delete-outputter.sh
+
+deploy: deploy-controller \
+		deploy-start-mapreduce \
+		deploy-splitter \
+		deploy-mapper \
+		deploy-combine \
+		deploy-shuffler \
+		deploy-reducer \
+		deploy-outputter
+
+remove: remove-controller \
+		remove-start-mapreduce \
+		remove-splitter \
+		remove-mapper \
+		remove-combine \
+		remove-shuffler \
+		remove-reducer \
+		remove-outputter
 
 create-pubsub-emulator:
 	@docker-compose up -d pubsub-emulator

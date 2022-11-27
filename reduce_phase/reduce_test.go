@@ -6,18 +6,18 @@ import (
 	"encoding/json"
 	"github.com/cloudevents/sdk-go/v2/event"
 	"github.com/stretchr/testify/assert"
-	sm "gitlab.com/cameron_w20/serverless-mapreduce"
+	"gitlab.com/cameron_w20/serverless-mapreduce/tools"
 	"testing"
 	"time"
 )
 
 func TestReducer(t *testing.T) {
 	// Given
-	teardown, subscriptions := sm.SetupTest(t, []string{"mapreduce-controller"})
+	teardown, subscriptions := tools.SetupTest(t, []string{"mapreduce-controller"})
 	defer teardown(t)
-	teardownRedis := sm.SetupRedisTest(t)
+	teardownRedis := tools.SetupRedisTest(t)
 	defer teardownRedis(t)
-	wordDataSlice := []sm.WordData{
+	wordDataSlice := []tools.WordData{
 		{SortedWord: "acer", Anagrams: map[string]struct{}{"care": {}, "race": {}}},
 	}
 	// Create a message
@@ -25,8 +25,8 @@ func TestReducer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error marshalling word data: %v", err)
 	}
-	message := sm.MessagePublishedData{
-		Message: sm.PubSubMessage{
+	message := tools.MessagePublishedData{
+		Message: tools.PubSubMessage{
 			Data:       wordDataBytes,
 			Attributes: map[string]string{"reducerNum": "1"},
 		},
@@ -41,14 +41,14 @@ func TestReducer(t *testing.T) {
 	}
 
 	expectedResult := []string{"care", "race"}
-	expectedControllerResult := sm.StatusMessage{Status: sm.STATUS_FINISHED}
+	expectedControllerResult := tools.StatusMessage{Status: tools.STATUS_FINISHED}
 
 	// When
-	err = reducer(context.Background(), e)
+	err = Reducer(context.Background(), e)
 
 	// Then
 	assert.Nil(t, err)
-	conn := sm.RedisPool.Get()
+	conn := tools.RedisPool.Get()
 	defer conn.Close()
 
 	li, err := conn.Do("SORT", wordDataSlice[0].SortedWord, "ALPHA")
@@ -65,7 +65,7 @@ func TestReducer(t *testing.T) {
 	// The subscription will listen forever unless given a context with a timeout
 	controllerCtx, controllerCancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer controllerCancel()
-	var received sm.StatusMessage
+	var received tools.StatusMessage
 	err = subscriptions[0].Receive(controllerCtx, func(ctx context.Context, msg *pubsub.Message) {
 		// Unmarshal the message data into the WordData struct
 		err := json.Unmarshal(msg.Data, &received)

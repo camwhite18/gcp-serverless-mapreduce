@@ -6,28 +6,28 @@ import (
 	"encoding/json"
 	"github.com/cloudevents/sdk-go/v2/event"
 	"github.com/stretchr/testify/assert"
-	sm "gitlab.com/cameron_w20/serverless-mapreduce"
+	"gitlab.com/cameron_w20/serverless-mapreduce/tools"
 	"testing"
 	"time"
 )
 
 func TestMapReduceController_StatusStarted(t *testing.T) {
 	// Given
-	teardown, _ := sm.SetupTest(t, []string{"mapreduce-outputter-0"})
+	teardown, _ := tools.SetupTest(t, []string{"mapreduce-outputter-0"})
 	defer teardown(t)
-	teardownRedis := sm.SetupRedisTest(t)
+	teardownRedis := tools.SetupRedisTest(t)
 	defer teardownRedis(t)
-	statusMessage := sm.StatusMessage{
+	statusMessage := tools.StatusMessage{
 		Id:     "12345",
-		Status: sm.STATUS_STARTED,
+		Status: tools.STATUS_STARTED,
 	}
 	// Create a message
 	statusMessageBytes, err := json.Marshal(statusMessage)
 	if err != nil {
 		t.Fatalf("Error marshalling status message: %v", err)
 	}
-	message := sm.MessagePublishedData{
-		Message: sm.PubSubMessage{
+	message := tools.MessagePublishedData{
+		Message: tools.PubSubMessage{
 			Data: statusMessageBytes,
 		},
 	}
@@ -43,11 +43,11 @@ func TestMapReduceController_StatusStarted(t *testing.T) {
 	expectedResult := []string{"12345"}
 
 	// When
-	err = controller(context.Background(), e)
+	err = Controller(context.Background(), e)
 
 	// Then
 	assert.Nil(t, err)
-	conn := sm.RedisPool.Get()
+	conn := tools.RedisPool.Get()
 	defer conn.Close()
 
 	li, err := conn.Do("SMEMBERS", "started-reducer-0")
@@ -63,22 +63,23 @@ func TestMapReduceController_StatusStarted(t *testing.T) {
 
 func TestMapReduceController_StatusFinished(t *testing.T) {
 	// Given
-	teardown, subscriptions := sm.SetupTest(t, []string{"mapreduce-outputter"})
+	teardown, subscriptions := tools.SetupTest(t, []string{"mapreduce-outputter-0"})
 	defer teardown(t)
-	teardownRedis := sm.SetupRedisTest(t)
+	teardownRedis := tools.SetupRedisTest(t)
 	defer teardownRedis(t)
-	statusMessage := sm.StatusMessage{
+	statusMessage := tools.StatusMessage{
 		Id:     "12345",
-		Status: sm.STATUS_FINISHED,
+		Status: tools.STATUS_FINISHED,
 	}
 	// Create a message
 	statusMessageBytes, err := json.Marshal(statusMessage)
 	if err != nil {
 		t.Fatalf("Error marshalling status message: %v", err)
 	}
-	message := sm.MessagePublishedData{
-		Message: sm.PubSubMessage{
-			Data: statusMessageBytes,
+	message := tools.MessagePublishedData{
+		Message: tools.PubSubMessage{
+			Data:       statusMessageBytes,
+			Attributes: map[string]string{"reducerNum": "0"},
 		},
 	}
 
@@ -90,7 +91,7 @@ func TestMapReduceController_StatusFinished(t *testing.T) {
 		t.Fatalf("Error setting event data: %v", err)
 	}
 
-	controllerRedisPool, err := sm.InitRedisPool()
+	controllerRedisPool, err := tools.InitRedisPool()
 	if err != nil {
 		t.Fatalf("Error initializing redis pool: %v", err)
 	}
@@ -99,7 +100,7 @@ func TestMapReduceController_StatusFinished(t *testing.T) {
 	_, err = conn.Do("SADD", "started-reducer-0", "12345")
 
 	// When
-	err = controller(context.Background(), e)
+	err = Controller(context.Background(), e)
 
 	// Then
 	assert.Nil(t, err)

@@ -3,54 +3,55 @@ package reduce_phase
 import (
 	"context"
 	"fmt"
-	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
 	"github.com/cloudevents/sdk-go/v2/event"
-	sm "gitlab.com/cameron_w20/serverless-mapreduce"
+	"gitlab.com/cameron_w20/serverless-mapreduce/tools"
 	"log"
 	"time"
 )
 
-func init() {
-	functions.CloudEvent("Reducer", reducer)
-}
-
-func reducer(ctx context.Context, e event.Event) error {
+// Reducer is a function that is triggered by a message being published to the Reducer topic. It receives the list of
+// key-value pairs from the shuffler, and inserts each key value pair into the Reducer's Redis instance. It requires the
+// message data to be of type []WordData.
+func Reducer(ctx context.Context, e event.Event) error {
 	start := time.Now()
 	//Initialize the redis pool if it hasn't been initialized yet
-	if sm.RedisPool == nil {
+	if tools.RedisPool == nil {
 		var err error
-		sm.RedisPool, err = sm.InitRedisPool()
+		tools.RedisPool, err = tools.InitRedisPool()
 		if err != nil {
 			return fmt.Errorf("error initializing redis pool: %v", err)
 		}
 	}
-
-	var wordDataSlice []sm.WordData
-	client, attributes, err := sm.ReadPubSubMessage(context.Background(), e, &wordDataSlice)
+	// Read the data from the event i.e. message pushed from shuffler
+	var wordDataSlice []tools.WordData
+	client, attributes, err := tools.ReadPubSubMessage(context.Background(), e, &wordDataSlice)
 	if err != nil {
 		return fmt.Errorf("error reading pubsub message: %v", err)
 	}
-	conn := sm.RedisPool.Get()
+	defer client.Close()
+	// Get a connection from the redis pool
+	conn := tools.RedisPool.Get()
 	defer conn.Close()
-	// Store the data in a set in redis
+	// Loop through the word data and insert each key value pair into the redis instance
 	for _, wordData := range wordDataSlice {
 		for word := range wordData.Anagrams {
+			// Insert the key value pair into the redis instance, where the key is the sorted word and the value is added
+			// to a set of anagrams
 			_, err := conn.Do("SADD", wordData.SortedWord, word)
 			if err != nil {
-				log.Printf("error pushing value to set in redis: %v", err)
+				return fmt.Errorf("error pushing value to set in redis: %v", err)
 			}
 		}
 	}
-	// Send a message to the controller that we're done
 	// Create a client for the controller topic
-	controllerTopic := client.Topic("mapreduce-controller")
+	controllerTopic := client.Topic(tools.CONTROLLER_TOPIC)
 	defer controllerTopic.Stop()
-	statusMessage := sm.StatusMessage{
+	statusMessage := tools.StatusMessage{
 		Id:     attributes["partitionId"],
-		Status: sm.STATUS_FINISHED,
+		Status: tools.STATUS_FINISHED,
 	}
-	sm.SendPubSubMessage(ctx, nil, controllerTopic, statusMessage, attributes)
-	log.Printf("sent message to controller about reducer %s, partition %s", attributes["reducerNum"], attributes["partitionId"])
-	log.Printf("reducer took %v", time.Since(start))
+	// Send a message to the controller that the given partition has finished being processed
+	tools.SendPubSubMessage(ctx, nil, controllerTopic, statusMessage, attributes)
+	log.Printf("Reducer took %v", time.Since(start))
 	return nil
 }

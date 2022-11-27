@@ -3,32 +3,31 @@ package shuffle_phase
 import (
 	"cloud.google.com/go/pubsub"
 	"context"
-	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
 	"github.com/cloudevents/sdk-go/v2/event"
-	"gitlab.com/cameron_w20/serverless-mapreduce"
+	"gitlab.com/cameron_w20/serverless-mapreduce/tools"
 	"hash/fnv"
 	"log"
 	"strconv"
 	"sync"
 )
 
-func init() {
-	functions.CloudEvent("Shuffler", shuffler)
-}
-
-func shuffler(ctx context.Context, e event.Event) error {
-	var wordData []serverless_mapreduce.WordData
-	client, attributes, err := serverless_mapreduce.ReadPubSubMessage(ctx, e, &wordData)
+// Shuffler is a function that is triggered by a message being published to the Shuffler topic. It receives a list of
+// WordData objects and shuffles them into a map of reducer number to a list of WordData objects. It then pushes each
+// list of WordData objects to the appropriate reducer topic.
+func Shuffler(ctx context.Context, e event.Event) error {
+	// Read the data from the event i.e. message pushed from Combine
+	var wordData []tools.WordData
+	client, attributes, err := tools.ReadPubSubMessage(ctx, e, &wordData)
 	if err != nil {
 		return err
 	}
 	defer client.Close()
-	// Shuffle the words into a map of reducer number to a list of words
+	// Shuffle the words into a map of reducer number a list of WordData objects
 	shuffledText := shuffle(wordData)
-	// Create topic object for each reducer
+	// Create topic client for each reducer topic
 	var topics []*pubsub.Topic
-	for i := 0; i < serverless_mapreduce.NO_OF_REDUCER_INSTANCES; i++ {
-		topics = append(topics, client.Topic("mapreduce-reducer-"+strconv.Itoa(i)))
+	for i := 0; i < tools.NO_OF_REDUCER_INSTANCES; i++ {
+		topics = append(topics, client.Topic(tools.REDUCER_TOPIC+"-"+strconv.Itoa(i)))
 	}
 	// Stop the topics when done
 	defer func() {
@@ -36,9 +35,10 @@ func shuffler(ctx context.Context, e event.Event) error {
 			topic.Stop()
 		}
 	}()
-	// Send the shuffled words to the reducers
+	// Send each list of WordData objects to the appropriate reducer topic concurrently
 	var wg sync.WaitGroup
 	for reducerNum, wordData := range shuffledText {
+		// Create a copy of the attributes to prevent the reducerNum from being overwritten by other goroutines
 		reducerAttributes := make(map[string]string)
 		for k, v := range attributes {
 			reducerAttributes[k] = v
@@ -46,29 +46,39 @@ func shuffler(ctx context.Context, e event.Event) error {
 		reducerAttributes["reducerNum"] = strconv.Itoa(reducerNum)
 		wg.Add(1)
 		log.Printf("reducerAttributes: %v", reducerAttributes)
-		go serverless_mapreduce.SendPubSubMessage(ctx, &wg, topics[reducerNum], wordData, reducerAttributes)
+		// Push the list of WordData objects to the appropriate reducer topic
+		go tools.SendPubSubMessage(ctx, &wg, topics[reducerNum], wordData, reducerAttributes)
 	}
+	// Wait for all the messages to be sent
 	wg.Wait()
 	return nil
 }
 
-func shuffle(wordData []serverless_mapreduce.WordData) map[int][]serverless_mapreduce.WordData {
-	shuffledText := make(map[int][]serverless_mapreduce.WordData)
+// shuffle takes a list of WordData objects and shuffles them into a map of reducer number to a list of WordData objects
+func shuffle(wordData []tools.WordData) map[int][]tools.WordData {
+	// Create a map of reducer number to a list of WordData objects
+	shuffledText := make(map[int][]tools.WordData)
 	var mu sync.Mutex
 	var wg sync.WaitGroup
+	// Loop through each WordData object and add it to the appropriate reducer number concurrently
 	for _, value := range wordData {
 		wg.Add(1)
-		go func(value serverless_mapreduce.WordData) {
+		go func(value tools.WordData) {
 			defer wg.Done()
+			// Get the reducer number for a given sorted word
 			reducerNum := partition(value.SortedWord)
+			// Lock the map to prevent concurrent writes
 			mu.Lock()
+			// Add the WordData object to the appropriate reducer number
 			if shuffledText[reducerNum] == nil {
-				shuffledText[reducerNum] = make([]serverless_mapreduce.WordData, 0)
+				shuffledText[reducerNum] = make([]tools.WordData, 0)
 			}
 			shuffledText[reducerNum] = append(shuffledText[reducerNum], value)
+			// Unlock the map
 			mu.Unlock()
 		}(value)
 	}
+	// Wait for all the words to be added to the map
 	wg.Wait()
 	return shuffledText
 }
@@ -76,8 +86,10 @@ func shuffle(wordData []serverless_mapreduce.WordData) map[int][]serverless_mapr
 // partition takes a word and returns the reducer number it should be sent to by taking the modulus of the
 // hashed word with the total number of reducers
 func partition(s string) int {
+	// Create a new hash
 	h := fnv.New32a()
 	_, _ = h.Write([]byte(s))
 	hashedString := h.Sum32()
-	return int(hashedString % uint32(serverless_mapreduce.NO_OF_REDUCER_INSTANCES))
+	// Take the modulus of the hashed word with the total number of reducers
+	return int(hashedString % uint32(tools.NO_OF_REDUCER_INSTANCES))
 }

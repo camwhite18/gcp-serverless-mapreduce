@@ -1,12 +1,11 @@
-package init
+package service
 
 import (
 	"cloud.google.com/go/pubsub"
 	"cloud.google.com/go/storage"
 	"context"
 	"encoding/json"
-	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
-	sm "gitlab.com/cameron_w20/serverless-mapreduce"
+	"gitlab.com/cameron_w20/serverless-mapreduce/tools"
 	"google.golang.org/api/iterator"
 	"log"
 	"net/http"
@@ -14,21 +13,17 @@ import (
 	"time"
 )
 
-func init() {
-	functions.HTTP("StartMapreduce", startMapreduce)
-}
-
 // Response is the response object sent to the client
 type Response struct {
 	ResponseCode int    `json:"responseCode"`
 	Message      string `json:"message"`
 }
 
-// startMapreduce is a function triggered by an HTTP request which starts the MapReduce process. It reads all the file
+// StartMapReduce is a function triggered by an HTTP request which starts the MapReduce process. It reads all the file
 // names in the input bucket and pushes them to the splitter topic. The function requires two query parameters:
 // input-bucket: the name of the bucket containing the input files
 // output-bucket: the name of the bucket where the output files will be stored
-func startMapreduce(w http.ResponseWriter, r *http.Request) {
+func StartMapReduce(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	// Get the query parameters
 	inputBucketName := r.URL.Query().Get("input-bucket")
@@ -60,18 +55,18 @@ func startMapreduce(w http.ResponseWriter, r *http.Request) {
 	}
 	defer client.Close()
 	// Create a client for the splitter topic
-	topic := client.Topic(sm.SPLITTER_TOPIC)
+	topic := client.Topic(tools.SPLITTER_TOPIC)
 	// Push each file name to the splitter topic
 	// Use a wait group so we can wait for all the messages to be sent before returning
 	var wg sync.WaitGroup
 	for _, file := range files {
-		splitterData := sm.SplitterData{
+		splitterData := tools.SplitterData{
 			BucketName: inputBucketName,
 			FileName:   file,
 		}
 		wg.Add(1)
 		// Use a goroutine to send the messages concurrently -> this is faster than sending them sequentially
-		go sm.SendPubSubMessage(ctx, &wg, topic, splitterData, map[string]string{"outputBucket": outputBucketName})
+		go tools.SendPubSubMessage(ctx, &wg, topic, splitterData, map[string]string{"outputBucket": outputBucketName})
 	}
 	wg.Wait()
 	writeResponse(w, http.StatusOK, "MapReduce started successfully - results will be stored in: "+outputBucketName)

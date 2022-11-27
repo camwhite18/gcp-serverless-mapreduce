@@ -7,7 +7,7 @@ import (
 	"github.com/cloudevents/sdk-go/v2/event"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
-	"gitlab.com/cameron_w20/serverless-mapreduce"
+	"gitlab.com/cameron_w20/serverless-mapreduce/tools"
 	"log"
 	"sync"
 	"testing"
@@ -16,28 +16,28 @@ import (
 
 func TestSplitter(t *testing.T) {
 	// Setup test
-	teardown, subscriptions := serverless_mapreduce.SetupTest(t, []string{"mapreduce-mapper", "mapreduce-controller"})
+	teardown, subscriptions := tools.SetupTest(t, []string{"mapreduce-Mapper", "mapreduce-controller"})
 	defer teardown(t)
-	teardownTestStorage := serverless_mapreduce.CreateTestStorage(t)
+	teardownTestStorage := tools.CreateTestStorage(t)
 	defer teardownTestStorage(t)
 
 	// Given
 	// Create a message
-	inputData := serverless_mapreduce.SplitterData{
-		BucketName: serverless_mapreduce.INPUT_BUCKET_NAME,
+	inputData := tools.SplitterData{
+		BucketName: tools.INPUT_BUCKET_NAME,
 		FileName:   "test.txt",
 	}
 	inputDataBytes, err := json.Marshal(inputData)
 	if err != nil {
 		t.Fatalf("Error marshalling splitter data: %v", err)
 	}
-	message := serverless_mapreduce.MessagePublishedData{
-		Message: serverless_mapreduce.PubSubMessage{
+	message := tools.MessagePublishedData{
+		Message: tools.PubSubMessage{
 			Data:       inputDataBytes,
 			Attributes: make(map[string]string),
 		},
 	}
-	// Create a CloudEvent to be sent to the mapper
+	// Create a CloudEvent to be sent to the Mapper
 	e := event.New()
 	e.SetDataContentType("application/json")
 	err = e.SetData(e.DataContentType(), message)
@@ -46,15 +46,15 @@ func TestSplitter(t *testing.T) {
 	}
 
 	expectedResult := []string{"The", "quick", "brown", "fox", "jumps", "over", "the", "lazy", "dog."}
-	expectedControllerResult := serverless_mapreduce.StatusMessage{Status: serverless_mapreduce.STATUS_STARTED}
+	expectedControllerResult := tools.StatusMessage{Status: tools.STATUS_STARTED}
 
 	// When
-	err = splitter(context.Background(), e)
+	err = Splitter(context.Background(), e)
 
 	// Then
 	// Ensure there are no errors returned
 	assert.Nil(t, err)
-	// Ensure the mapper received the correct data
+	// Ensure the Mapper received the correct data
 	// The subscription will listen forever unless given a context with a timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
@@ -76,7 +76,7 @@ func TestSplitter(t *testing.T) {
 	// The subscription will listen forever unless given a context with a timeout
 	controllerCtx, controllerCancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer controllerCancel()
-	var received serverless_mapreduce.StatusMessage
+	var received tools.StatusMessage
 	err = subscriptions[1].Receive(controllerCtx, func(ctx context.Context, msg *pubsub.Message) {
 		// Unmarshal the message data into the WordData struct
 		err := json.Unmarshal(msg.Data, &received)

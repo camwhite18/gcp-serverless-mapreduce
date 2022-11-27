@@ -6,31 +6,31 @@ import (
 	"encoding/json"
 	"github.com/cloudevents/sdk-go/v2/event"
 	"github.com/stretchr/testify/assert"
-	"gitlab.com/cameron_w20/serverless-mapreduce"
+	"gitlab.com/cameron_w20/serverless-mapreduce/tools"
 	"testing"
 	"time"
 )
 
 func TestShuffler(t *testing.T) {
 	// Setup test
-	teardown, subscriptions := serverless_mapreduce.SetupTest(t, []string{"mapreduce-reducer-1"})
+	teardown, subscriptions := tools.SetupTest(t, []string{"mapreduce-reducer-1"})
 	defer teardown(t)
 	// Given
 	// Create a message
-	inputData := []serverless_mapreduce.WordData{
+	inputData := []tools.WordData{
 		{SortedWord: "acer", Anagrams: map[string]struct{}{"care": {}, "race": {}}},
 	}
 	inputDataBytes, err := json.Marshal(inputData)
 	if err != nil {
-		t.Fatalf("Error marshalling shuffler data: %v", err)
+		t.Fatalf("Error marshalling Shuffler data: %v", err)
 	}
-	message := serverless_mapreduce.MessagePublishedData{
-		Message: serverless_mapreduce.PubSubMessage{
+	message := tools.MessagePublishedData{
+		Message: tools.PubSubMessage{
 			Data:       inputDataBytes,
 			Attributes: make(map[string]string),
 		},
 	}
-	// Create a CloudEvent to be sent to the shuffler
+	// Create a CloudEvent to be sent to the Shuffler
 	e := event.New()
 	e.SetDataContentType("application/json")
 	err = e.SetData(e.DataContentType(), message)
@@ -38,12 +38,12 @@ func TestShuffler(t *testing.T) {
 		t.Fatalf("Error setting event data: %v", err)
 	}
 
-	expectedResult := []serverless_mapreduce.WordData{
+	expectedResult := []tools.WordData{
 		{SortedWord: "acer", Anagrams: map[string]struct{}{"care": {}, "race": {}}},
 	}
 
 	// When
-	err = shuffler(context.Background(), e)
+	err = Shuffler(context.Background(), e)
 
 	// Then
 	// Ensure there are no errors returned
@@ -51,7 +51,7 @@ func TestShuffler(t *testing.T) {
 	// The subscription will listen forever unless given a context with a timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	var actualResult []serverless_mapreduce.WordData
+	var actualResult []tools.WordData
 	err = subscriptions[0].Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
 		// Unmarshal the message data into the WordData struct
 		err := json.Unmarshal(msg.Data, &actualResult)

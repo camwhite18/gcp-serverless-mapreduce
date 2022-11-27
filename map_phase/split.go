@@ -6,10 +6,9 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
 	"github.com/cloudevents/sdk-go/v2/event"
 	"github.com/google/uuid"
-	sm "gitlab.com/cameron_w20/serverless-mapreduce"
+	"gitlab.com/cameron_w20/serverless-mapreduce/tools"
 	"io"
 	"log"
 	"math"
@@ -19,18 +18,14 @@ import (
 	"time"
 )
 
-func init() {
-	functions.CloudEvent("Splitter", splitter)
-}
-
-// splitter is a function that is triggered by a message being published to the splitter topic. It reads the file from
-// the bucket, splits it into partitions and sends the partitions to the mapper. It requires the message data to be of
+// Splitter is a function that is triggered by a message being published to the splitter topic. It reads the file from
+// the bucket, splits it into partitions and sends the partitions to the Mapper. It requires the message data to be of
 // type SplitterData.
-func splitter(ctx context.Context, e event.Event) error {
+func Splitter(ctx context.Context, e event.Event) error {
 	start := time.Now()
 	// Read the data from the event i.e. message pushed from startMapReduce
-	splitterData := sm.SplitterData{}
-	client, attributes, err := sm.ReadPubSubMessage(ctx, e, &splitterData)
+	splitterData := tools.SplitterData{}
+	client, attributes, err := tools.ReadPubSubMessage(ctx, e, &splitterData)
 	if err != nil {
 		return err
 	}
@@ -40,10 +35,10 @@ func splitter(ctx context.Context, e event.Event) error {
 	if err != nil {
 		return fmt.Errorf("error splitting file: %v", err)
 	}
-	// Send the partitions to the mapper
+	// Send the partitions to the Mapper
 	err = sendTextToMapper(ctx, client, attributes, partitionedText)
 	if err != nil {
-		return fmt.Errorf("error sending text to mapper: %v", err)
+		return fmt.Errorf("error sending text to Mapper: %v", err)
 	}
 	log.Printf("Splitter took %s", time.Since(start))
 	return nil
@@ -62,7 +57,7 @@ func splitFile(ctx context.Context, bucketName, fileName string) ([][]string, er
 	// Split the file into a list of words
 	splitText := strings.Fields(string(data))
 	// Partition the file since this will speed up the map phase
-	partitionedText := partitionFile(splitText, sm.MAX_MESSAGE_SIZE_BYTES)
+	partitionedText := partitionFile(splitText, tools.MAX_MESSAGE_SIZE_BYTES)
 	return partitionedText, nil
 }
 
@@ -137,14 +132,14 @@ func partitionFile(splitText []string, messageSize int) [][]string {
 	return partitions
 }
 
-// sendTextToMapper sends the given text to the mapper and returns an error
+// sendTextToMapper sends the given text to the Mapper and returns an error
 func sendTextToMapper(ctx context.Context, client *pubsub.Client, attributes map[string]string,
 	partitionedText [][]string) error {
-	// Create a client for the mapper topic
-	mapperTopic := client.Topic(sm.MAPPER_TOPIC)
+	// Create a client for the Mapper topic
+	mapperTopic := client.Topic(tools.MAPPER_TOPIC)
 	defer mapperTopic.Stop()
 	// Create a client for the controller topic
-	controllerTopic := client.Topic(sm.CONTROLLER_TOPIC)
+	controllerTopic := client.Topic(tools.CONTROLLER_TOPIC)
 	defer controllerTopic.Stop()
 	// We need to use a wait group to wait for all the messages to be published before returning
 	var wg sync.WaitGroup
@@ -156,17 +151,18 @@ func sendTextToMapper(ctx context.Context, client *pubsub.Client, attributes map
 		}
 		// Create a unique id for the partition so that we can track it
 		partitionAttributes["partitionId"] = uuid.New().String()
+		// Send the message concurrently to speed up the process
 		wg.Add(2)
-		// Publish the partition to the mapper topic
-		go sm.SendPubSubMessage(ctx, &wg, mapperTopic, partition, partitionAttributes)
+		// Publish the partition to the Mapper topic
+		go tools.SendPubSubMessage(ctx, &wg, mapperTopic, partition, partitionAttributes)
 		// Send a message to the controller topic to let it know that a partition has been published
 		go func() {
-			statusMessage := sm.StatusMessage{
+			statusMessage := tools.StatusMessage{
 				Id:     partitionAttributes["partitionId"],
-				Status: sm.STATUS_STARTED,
+				Status: tools.STATUS_STARTED,
 			}
 			log.Printf("Sending status message: %v", statusMessage)
-			sm.SendPubSubMessage(ctx, &wg, controllerTopic, statusMessage, nil)
+			tools.SendPubSubMessage(ctx, &wg, controllerTopic, statusMessage, nil)
 		}()
 	}
 	wg.Wait()

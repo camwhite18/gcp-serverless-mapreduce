@@ -2,9 +2,8 @@ package map_phase
 
 import (
 	"context"
-	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
 	"github.com/cloudevents/sdk-go/v2/event"
-	"gitlab.com/cameron_w20/serverless-mapreduce"
+	"gitlab.com/cameron_w20/serverless-mapreduce/tools"
 	"log"
 	"sort"
 	"strings"
@@ -12,38 +11,45 @@ import (
 	"time"
 )
 
-func init() {
-	functions.CloudEvent("Mapper", mapper)
-}
-
-func mapper(ctx context.Context, e event.Event) error {
+// Mapper is a function that is triggered by a message being published to the Mapper topic. It reads the split text from
+// the message, pre-processes it, creates a key-value pair of the sorted word and the word and sends the list of key-value
+// pairs to the combiner. It requires the message data to be of type []string.
+func Mapper(ctx context.Context, e event.Event) error {
 	start := time.Now()
+	// Read the data from the event i.e. message pushed from splitter
 	var text []string
-	client, attributes, err := serverless_mapreduce.ReadPubSubMessage(ctx, e, &text)
+	client, attributes, err := tools.ReadPubSubMessage(ctx, e, &text)
 	if err != nil {
 		return err
 	}
 	defer client.Close()
-	var mappedText []serverless_mapreduce.WordData
+	// Map the words to their sorted form concurrently and store the results in mappedText
+	var mappedText []tools.WordData
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	for _, word := range text {
 		wg.Add(1)
+		// Map each word in a goroutine
 		go mapWord(&wg, &mu, &mappedText, word)
 	}
+	// Wait for all the words to be mapped
 	wg.Wait()
-	topic := client.Topic("mapreduce-combine")
+	// Create a client for the combine topic
+	topic := client.Topic(tools.COMBINE_TOPIC)
 	defer topic.Stop()
 	// Send one pubsub message to the combiner per book to reduce the number of invocations -> reduce cost
-	serverless_mapreduce.SendPubSubMessage(ctx, nil, topic, mappedText, attributes)
+	tools.SendPubSubMessage(ctx, nil, topic, mappedText, attributes)
 	log.Printf("Mapper took %v to run", time.Since(start))
 	return nil
 }
 
-func mapWord(wg *sync.WaitGroup, mu *sync.Mutex, mappedText *[]serverless_mapreduce.WordData, word string) {
+// mapWord maps a word to its sorted form and stores the result in mappedText. It accepts a pointer to a WaitGroup, a
+// pointer to a sync.Mutex, a pointer to a slice of WordData and a string. It returns nothing.
+func mapWord(wg *sync.WaitGroup, mu *sync.Mutex, mappedText *[]tools.WordData, word string) {
 	defer wg.Done()
 	// Do some preprocessing on the word
 	preProcessedWord := preProcessWord(word)
+	// If the word is empty after preprocessing, return early
 	if preProcessedWord == "" {
 		return
 	}
@@ -51,17 +57,21 @@ func mapWord(wg *sync.WaitGroup, mu *sync.Mutex, mappedText *[]serverless_mapred
 	splitWord := strings.Split(preProcessedWord, "")
 	sort.Strings(splitWord)
 	sortedWord := strings.Join(splitWord, "")
+	// Use a map as the value in the key-value pair to avoid duplicates in later stages
 	anagrams := make(map[string]struct{})
+	// Add the word to the map with an empty struct as the value to save memory
 	anagrams[preProcessedWord] = struct{}{}
+	// Lock the mutex to prevent concurrent writes to mappedText
 	mu.Lock()
-	*mappedText = append(*mappedText, serverless_mapreduce.WordData{SortedWord: sortedWord, Anagrams: anagrams})
+	*mappedText = append(*mappedText, tools.WordData{SortedWord: sortedWord, Anagrams: anagrams})
+	// Unlock the mutex once the write is complete to allow other goroutines to write to mappedText
 	mu.Unlock()
 }
 
 // preProcessWord strips any punctuation from the word and converts it to lowercase. It also removes a word if it
 // is a stop word or contains any numbers or symbols.
 func preProcessWord(word string) string {
-	// Create a map containing all the stopwords as keys since Golang doesn't have sets
+	// Use a map to replicate the functionality of a set since Go doesn't have a set data structure
 	stopwords := map[string]struct{}{"'tis": {}, "'twas": {}, "a": {}, "able": {}, "about": {}, "across": {},
 		"after": {}, "ain't": {}, "all": {}, "almost": {}, "also": {}, "am": {}, "among": {}, "an": {}, "and": {},
 		"any": {}, "are": {}, "aren't": {}, "as": {}, "at": {}, "be": {}, "because": {}, "been": {}, "but": {},
@@ -88,8 +98,8 @@ func preProcessWord(word string) string {
 	}
 	// Convert to lowercase
 	word = strings.ToLower(word)
-	// Remove punctuation
-	word = strings.Trim(word, ".,;:!?\" ")
+	// Remove any punctuation from the start and end of the word
+	word = strings.Trim(word, ".,;:!?()'\" ")
 	// Remove the word if it is a stopword or contains numbers or symbols
 	if _, ok := stopwords[word]; ok || strings.ContainsAny(word, "0123456789*+-_&^%$#@!~`|}{[]\\:;\"'<>,.?/()") {
 		return ""

@@ -5,7 +5,7 @@ import (
 	"context"
 	"github.com/cloudevents/sdk-go/v2/event"
 	"github.com/stretchr/testify/assert"
-	sm "gitlab.com/cameron_w20/serverless-mapreduce"
+	"gitlab.com/cameron_w20/serverless-mapreduce/tools"
 	"io"
 	"testing"
 	"time"
@@ -13,17 +13,17 @@ import (
 
 func TestOutputResult(t *testing.T) {
 	// Setup test
-	teardown, _ := sm.SetupTest(t, []string{})
+	teardown, _ := tools.SetupTest(t, []string{})
 	defer teardown(t)
-	teardownStorage := sm.CreateTestStorage(t)
+	teardownStorage := tools.CreateTestStorage(t)
 	defer teardownStorage(t)
-	teardownRedis := sm.SetupRedisTest(t)
+	teardownRedis := tools.SetupRedisTest(t)
 	defer teardownRedis(t)
 	// Given
 	// Create a message
-	message := sm.MessagePublishedData{
-		Message: sm.PubSubMessage{
-			Attributes: map[string]string{"reducerNum": "1", "outputBucket": sm.OUTPUT_BUCKET_NAME},
+	message := tools.MessagePublishedData{
+		Message: tools.PubSubMessage{
+			Attributes: map[string]string{"reducerNum": "1", "outputBucket": tools.OUTPUT_BUCKET_NAME},
 		},
 	}
 	// Create a CloudEvent to be sent to the mapper
@@ -35,7 +35,7 @@ func TestOutputResult(t *testing.T) {
 	}
 
 	// Add data to redis
-	conn := sm.RedisPool.Get()
+	conn := tools.RedisPool.Get()
 	defer conn.Close()
 	_, err = conn.Do("SADD", "acer", "race")
 	if err != nil {
@@ -49,7 +49,7 @@ func TestOutputResult(t *testing.T) {
 	expectedResult := []byte("acer: care race\n")
 
 	// When
-	err = outputResult(context.Background(), e)
+	err = OutputAnagrams(context.Background(), e)
 
 	// Then
 	assert.Nil(t, err)
@@ -61,9 +61,9 @@ func TestOutputResult(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error creating storage client: %v", err)
 	}
-	outputBucket := client.Bucket(sm.OUTPUT_BUCKET_NAME)
+	outputBucket := client.Bucket(tools.OUTPUT_BUCKET_NAME)
 	// Create a reader to read the file
-	reader, err := outputBucket.Object("reducer-1-output.txt").NewReader(storageCtx)
+	reader, err := outputBucket.Object("anagrams-part-1.txt").NewReader(storageCtx)
 	if err != nil {
 		t.Fatalf("Error creating reader: %v", err)
 	}

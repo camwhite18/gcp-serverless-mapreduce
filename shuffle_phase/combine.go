@@ -2,26 +2,24 @@ package shuffle_phase
 
 import (
 	"context"
-	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
 	"github.com/cloudevents/sdk-go/v2/event"
-	"gitlab.com/cameron_w20/serverless-mapreduce"
+	"gitlab.com/cameron_w20/serverless-mapreduce/tools"
 )
 
-func init() {
-	functions.CloudEvent("Combine", combine)
-}
-
-func combine(ctx context.Context, e event.Event) error {
-	var wordData []serverless_mapreduce.WordData
-	client, attributes, err := serverless_mapreduce.ReadPubSubMessage(ctx, e, &wordData)
+// Combine is a function that is triggered by a message being published to the Combine topic. It receives the list of
+// key-value pairs from the mapper, and does a mini-reduce to group the key-value pairs by key. It requires the message
+// data to be of type []WordData.
+func Combine(ctx context.Context, e event.Event) error {
+	// Read the data from the event i.e. message pushed from mapper
+	var wordData []tools.WordData
+	client, attributes, err := tools.ReadPubSubMessage(ctx, e, &wordData)
 	if err != nil {
 		return err
 	}
 	defer client.Close()
-
-	// Do a mini reduce on the data from the mapper.
-	// Use map[string]struct{} to act as a set to remove duplicate words.
+	// Use map[string]struct{} as the value to act as a set to not consider duplicate words
 	combinedWordDataMap := make(map[string]map[string]struct{})
+	// Combine the key-value pairs
 	for _, pair := range wordData {
 		if combinedWordDataMap[pair.SortedWord] == nil {
 			combinedWordDataMap[pair.SortedWord] = pair.Anagrams
@@ -31,11 +29,12 @@ func combine(ctx context.Context, e event.Event) error {
 			}
 		}
 	}
-	// Convert the map to a slice
-	combinedText := make([]serverless_mapreduce.WordData, 0)
+	// Convert the map to a slice of WordData
+	combinedKeyValues := make([]tools.WordData, 0)
 	for k, v := range combinedWordDataMap {
-		combinedText = append(combinedText, serverless_mapreduce.WordData{SortedWord: k, Anagrams: v})
+		combinedKeyValues = append(combinedKeyValues, tools.WordData{SortedWord: k, Anagrams: v})
 	}
-	serverless_mapreduce.SendPubSubMessage(ctx, nil, client.Topic("mapreduce-shuffler"), combinedText, attributes)
+	// Send the combined key-value pairs to the Shuffler topic
+	tools.SendPubSubMessage(ctx, nil, client.Topic(tools.SHUFFLER_TOPIC), combinedKeyValues, attributes)
 	return nil
 }

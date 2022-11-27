@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"github.com/cloudevents/sdk-go/v2/event"
 	"github.com/stretchr/testify/assert"
-	"gitlab.com/cameron_w20/serverless-mapreduce"
+	"gitlab.com/cameron_w20/serverless-mapreduce/tools"
 	"log"
 	"testing"
 	"time"
@@ -14,22 +14,22 @@ import (
 
 func TestMapper(t *testing.T) {
 	// Setup test
-	teardown, subscriptions := serverless_mapreduce.SetupTest(t, []string{"mapreduce-combine"})
+	teardown, subscriptions := tools.SetupTest(t, []string{"mapreduce-combine"})
 	defer teardown(t)
 	// Given
 	// Create a message
 	inputData := []string{"quick", "brown", "fox", "quick"}
 	inputDataBytes, err := json.Marshal(inputData)
 	if err != nil {
-		t.Fatalf("Error marshalling mapper data: %v", err)
+		t.Fatalf("Error marshalling Mapper data: %v", err)
 	}
-	message := serverless_mapreduce.MessagePublishedData{
-		Message: serverless_mapreduce.PubSubMessage{
+	message := tools.MessagePublishedData{
+		Message: tools.PubSubMessage{
 			Data:       inputDataBytes,
 			Attributes: make(map[string]string),
 		},
 	}
-	// Create a CloudEvent to be sent to the mapper
+	// Create a CloudEvent to be sent to the Mapper
 	e := event.New()
 	e.SetDataContentType("application/json")
 	err = e.SetData(e.DataContentType(), message)
@@ -37,14 +37,14 @@ func TestMapper(t *testing.T) {
 		t.Fatalf("Error setting event data: %v", err)
 	}
 
-	expectedResult := []serverless_mapreduce.WordData{
+	expectedResult := []tools.WordData{
 		{Anagrams: map[string]struct{}{"quick": {}}, SortedWord: "cikqu"},
 		{Anagrams: map[string]struct{}{"brown": {}}, SortedWord: "bnorw"},
 		{Anagrams: map[string]struct{}{"fox": {}}, SortedWord: "fox"},
 	}
 
 	// When
-	err = mapper(context.Background(), e)
+	err = Mapper(context.Background(), e)
 
 	// Then
 	// Ensure there are no errors returned
@@ -52,7 +52,7 @@ func TestMapper(t *testing.T) {
 	// The subscription will listen forever unless given a context with a timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	var actualResult []serverless_mapreduce.WordData
+	var actualResult []tools.WordData
 	err = subscriptions[0].Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
 		// Unmarshal the message data into the WordData struct
 		err := json.Unmarshal(msg.Data, &actualResult)
@@ -107,7 +107,7 @@ func TestProcessTextStopWord(t *testing.T) {
 
 func TestMapperPerformance(t *testing.T) {
 	// Setup test
-	teardown, subscriptions := serverless_mapreduce.SetupTest(t, []string{"mapreduce-combine"})
+	teardown, subscriptions := tools.SetupTest(t, []string{"mapreduce-combine"})
 	defer teardown(t)
 	// Given
 	// Create a message
@@ -117,15 +117,15 @@ func TestMapperPerformance(t *testing.T) {
 	}
 	inputDataBytes, err := json.Marshal(inputData)
 	if err != nil {
-		t.Fatalf("Error marshalling mapper data: %v", err)
+		t.Fatalf("Error marshalling Mapper data: %v", err)
 	}
-	message := serverless_mapreduce.MessagePublishedData{
-		Message: serverless_mapreduce.PubSubMessage{
+	message := tools.MessagePublishedData{
+		Message: tools.PubSubMessage{
 			Data:       inputDataBytes,
 			Attributes: make(map[string]string),
 		},
 	}
-	// Create a CloudEvent to be sent to the mapper
+	// Create a CloudEvent to be sent to the Mapper
 	e := event.New()
 	e.SetDataContentType("application/json")
 	err = e.SetData(e.DataContentType(), message)
@@ -133,14 +133,14 @@ func TestMapperPerformance(t *testing.T) {
 		t.Fatalf("Error setting event data: %v", err)
 	}
 
-	var expectedResult []serverless_mapreduce.WordData
+	var expectedResult []tools.WordData
 	for i := 0; i < 100000; i++ {
-		expectedResult = append(expectedResult, serverless_mapreduce.WordData{Anagrams: map[string]struct{}{"quick": {}}, SortedWord: "cikqu"})
+		expectedResult = append(expectedResult, tools.WordData{Anagrams: map[string]struct{}{"quick": {}}, SortedWord: "cikqu"})
 	}
 
 	// When
 	start := time.Now()
-	err = mapper(context.Background(), e)
+	err = Mapper(context.Background(), e)
 	log.Printf("Mapper took %v", time.Since(start))
 
 	// Then
@@ -149,7 +149,7 @@ func TestMapperPerformance(t *testing.T) {
 	// The subscription will listen forever unless given a context with a timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	var actualResult []serverless_mapreduce.WordData
+	var actualResult []tools.WordData
 	err = subscriptions[0].Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
 		// Unmarshal the message data into the WordData struct
 		err := json.Unmarshal(msg.Data, &actualResult)

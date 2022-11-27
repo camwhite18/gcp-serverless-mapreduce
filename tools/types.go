@@ -1,4 +1,4 @@
-package serverless_mapreduce
+package tools
 
 import (
 	"github.com/gomodule/redigo/redis"
