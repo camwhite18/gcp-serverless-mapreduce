@@ -3,6 +3,18 @@ OUTPUT_BUCKET_NAME=serverless-mapreduce-output
 GCP_REGION=europe-west2
 GCP_PROJECT=serverless-mapreduce
 
+setup-test: create-pubsub-emulator create-storage-emulator
+
+teardown-test: remove-pubsub-emulator remove-storage-emulator
+
+test-unit:
+	./scripts/test-unit.sh
+
+test-coverage:
+	./scripts/coverage-report.sh
+
+test: setup-test test-unit test-coverage teardown-test
+
 create-input-bucket:
 	@gsutil mb -l $(GCP_REGION) gs://$(INPUT_BUCKET_NAME)
 
@@ -39,18 +51,10 @@ remove-controller:
 	./controller/delete-controller.sh
 
 deploy-init-mapreduce:
-	@gcloud functions deploy init-mapreduce \
-		--gen2 \
-		--runtime=go116 \
-		--trigger-http \
-		--source=. \
-		--entry-point Service \
-		--region=$(GCP_REGION) \
-		--memory=512MB \
-		--project=$(GCP_PROJECT)
+	./service/deploy-init-mapreduce.sh
 
 remove-init-mapreduce:
-	@gcloud functions delete init-mapreduce --region=$(GCP_REGION) --project=$(GCP_PROJECT) --gen2
+	./service/delete-init-mapreduce.sh
 
 deploy-splitter:
 	./map_phase/deploy-splitter.sh
