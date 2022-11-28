@@ -14,3 +14,8 @@ services:
       - "9023"
     volumes:
       - ${PWD}/cloudstorage:/storage
+  redis:
+    image: redis/redis-stack:latest
+    ports:
+      - "6379:6379"
+      - "8001:8001"
