@@ -1,38 +1,37 @@
 package reduce_phase
 
 import (
-	"cloud.google.com/go/pubsub"
+	"cloud.google.com/go/storage"
 	"context"
 	"encoding/json"
 	"github.com/cloudevents/sdk-go/v2/event"
 	"github.com/stretchr/testify/assert"
 	"gitlab.com/cameron_w20/serverless-mapreduce/tools"
+	"io"
 	"testing"
 	"time"
 )
 
 func TestReducer(t *testing.T) {
 	// Given
-	teardown, subscriptions := tools.SetupTest(t, []string{tools.CONTROLLER_TOPIC})
+	teardown, _ := tools.SetupTest(t, []string{})
 	defer teardown(t)
+	teardownStorage := tools.CreateTestStorage(t)
+	defer teardownStorage(t)
 	teardownRedis := tools.SetupRedisTest(t)
 	defer teardownRedis(t)
-	wordDataSlice := []tools.WordData{
-		{SortedWord: "acer", Anagrams: map[string]struct{}{"care": {}, "race": {}}},
-	}
-	// Create a message
-	wordDataBytes, err := json.Marshal(wordDataSlice)
+
+	inputDataBytes, err := json.Marshal(nil)
 	if err != nil {
-		t.Fatalf("Error marshalling word data: %v", err)
+		t.Fatalf("Error marshalling mapper data: %v", err)
 	}
 	message := tools.MessagePublishedData{
 		Message: tools.PubSubMessage{
-			Data:       wordDataBytes,
-			Attributes: map[string]string{"reducerNum": "1"},
+			Data:       inputDataBytes,
+			Attributes: map[string]string{"outputBucket": tools.OUTPUT_BUCKET_NAME},
 		},
 	}
-
-	// Create a CloudEvent to be sent to the shuffler
+	// Create a CloudEvent to be sent to the mapper
 	e := event.New()
 	e.SetDataContentType("application/json")
 	err = e.SetData(e.DataContentType(), message)
@@ -40,43 +39,33 @@ func TestReducer(t *testing.T) {
 		t.Fatalf("Error setting event data: %v", err)
 	}
 
-	expectedResult := []string{"care", "race"}
-	expectedControllerResult := tools.StatusMessage{Status: tools.STATUS_FINISHED}
+	expectedResult1 := "acer: care race\n"
+	expectedResult2 := "aprt: part trap\n"
 
 	// When
 	err = Reducer(context.Background(), e)
 
 	// Then
 	assert.Nil(t, err)
-	conn := tools.RedisPool.Get()
-	defer conn.Close()
-
-	li, err := conn.Do("SORT", wordDataSlice[0].SortedWord, "ALPHA")
+	// Check that the data was stored in the file correctly
+	storageCtx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+	// Create a storage client so we can create a bucket
+	client, err := storage.NewClient(storageCtx)
 	if err != nil {
-		t.Fatalf("Error getting data from redis: %v", err)
+		t.Fatalf("Error creating storage client: %v", err)
 	}
-	var actualResult []string
-	for _, v := range li.([]interface{}) {
-		actualResult = append(actualResult, string(v.([]byte)))
+	// Create a reader to read the file
+	reader, err := client.Bucket(tools.OUTPUT_BUCKET_NAME).Object("anagrams-part-1.txt").NewReader(storageCtx)
+	if err != nil {
+		t.Fatalf("Error creating reader: %v", err)
 	}
-	assert.Equal(t, expectedResult, actualResult)
-
-	// Ensure the controller received the correct message
-	// The subscription will listen forever unless given a context with a timeout
-	controllerCtx, controllerCancel := context.WithTimeout(context.Background(), 1*time.Second)
-	defer controllerCancel()
-	var received tools.StatusMessage
-	err = subscriptions[0].Receive(controllerCtx, func(ctx context.Context, msg *pubsub.Message) {
-		// Unmarshal the message data into the WordData struct
-		err := json.Unmarshal(msg.Data, &received)
-		if err != nil {
-			t.Fatalf("Error unmarshalling message: %v", err)
-		}
-		assert.Equal(t, msg.Attributes["reducerNum"], "1")
-		msg.Ack()
-	})
-	// Ensure the message data matches the expected result
-	assert.Equal(t, expectedControllerResult.Status, received.Status)
-	// Ensure there are no errors returned by the receiver
-	assert.Nil(t, err)
+	// Read the file
+	actualResult, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("Error reading file: %v", err)
+	}
+	// Check that the data is correct
+	assert.Contains(t, string(actualResult), expectedResult1)
+	assert.Contains(t, string(actualResult), expectedResult2)
 }

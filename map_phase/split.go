@@ -169,19 +169,16 @@ func sendTextToMapper(ctx context.Context, client *pubsub.Client, attributes map
 		}
 		// Create a unique id for the partition so that we can track it
 		partitionAttributes["partitionId"] = uuid.New().String()
+		statusMessage := tools.StatusMessage{
+			Id:     partitionAttributes["partitionId"],
+			Status: tools.STATUS_STARTED,
+		}
 		// Send the message concurrently to speed up the process
 		wg.Add(2)
 		// Publish the partition to the Mapper topic
 		go tools.SendPubSubMessage(ctx, &wg, mapperTopic, partition, partitionAttributes)
 		// Send a message to the controller topic to let it know that a partition has been published
-		go func() {
-			statusMessage := tools.StatusMessage{
-				Id:     partitionAttributes["partitionId"],
-				Status: tools.STATUS_STARTED,
-			}
-			log.Printf("Sending status message: %v", statusMessage)
-			tools.SendPubSubMessage(ctx, &wg, controllerTopic, statusMessage, nil)
-		}()
+		go tools.SendPubSubMessage(ctx, &wg, controllerTopic, statusMessage, nil)
 	}
 	wg.Wait()
 	return nil

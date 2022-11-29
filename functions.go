@@ -18,5 +18,4 @@ func init() {
 	functions.CloudEvent("Combine", shuffle_phase.Combine)
 	functions.CloudEvent("Shuffler", shuffle_phase.Shuffler)
 	functions.CloudEvent("Reducer", reduce_phase.Reducer)
-	functions.CloudEvent("Outputter", reduce_phase.OutputAnagrams)
 }

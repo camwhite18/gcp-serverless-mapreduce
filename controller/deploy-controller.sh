@@ -6,7 +6,7 @@ if ! [ -x "$(command -v gcloud)" ]; then
   exit 1
 fi
 
-# Create VPC connector for serverless VPC access to Redis
+ Create VPC connector for serverless VPC access to Redis
 if (gcloud compute networks vpc-access connectors create mapreduce-connector \
     --project=serverless-mapreduce \
     --network=default \
@@ -28,24 +28,9 @@ else
   exit 1
 fi
 
-echo "Creating Redis instance mapreduce-controller"
-if (gcloud redis instances create mapreduce-controller \
-    --tier=basic \
-    --region=europe-west2 \
-    --size=1 \
-    --network=default) ; then
-  echo "Successfully created Redis instance mapreduce-controller"
-else
-  echo "Failed to create Redis instance mapreduce-controller="
-  exit 1
-fi
-
 REDIS_HOST=$(gcloud redis instances describe mapreduce-controller \
               --region=europe-west2 \
               --format="value(host)")
-REDIS_PORT=$(gcloud redis instances describe mapreduce-controller \
-              --region=europe-west2 \
-              --format="value(port)")
 
 echo "Deploying controller"
 if (gcloud functions deploy controller \
@@ -58,7 +43,7 @@ if (gcloud functions deploy controller \
     --memory=512MB \
     --project=serverless-mapreduce \
     --vpc-connector=projects/serverless-mapreduce/locations/europe-west2/connectors/mapreduce-connector \
-    --set-env-vars=REDIS_HOST="$REDIS_HOST",REDIS_PORT="$REDIS_PORT"
+    --set-env-vars=REDIS_HOST="$REDIS_HOST"
     ) ; then
   echo "Successfully deployed controller"
 else

@@ -7,7 +7,7 @@ import (
 
 const NO_OF_REDUCER_INSTANCES = 5
 
-const MAX_MESSAGE_SIZE_BYTES = 100000
+const MAX_MESSAGE_SIZE_BYTES = 50000
 const MAX_MESSAGE_COUNT = 100
 const MAX_MESSAGE_DELAY = 50 * time.Millisecond
 
@@ -17,13 +17,12 @@ const MAPPER_TOPIC = "mapreduce-mapper"
 const COMBINE_TOPIC = "mapreduce-combine"
 const SHUFFLER_TOPIC = "mapreduce-shuffler"
 const REDUCER_TOPIC = "mapreduce-reducer"
-const OUTPUTTER_TOPIC = "mapreduce-outputter"
 
 const STATUS_STARTED = "started"
 const STATUS_FINISHED = "finished"
 
 var RedisPool *redis.Pool
-var ShufflerRedisPool []*redis.Pool
+var ReducerRedisPool []*redis.Pool
 
 type MessagePublishedData struct {
 	Message PubSubMessage
@@ -47,10 +46,4 @@ type WordData struct {
 type SplitterData struct {
 	BucketName string `json:"bucketName"`
 	FileName   string `json:"fileName"`
-}
-
-type ReducerData struct {
-	ReducerNum string `json:"reducerNum"`
-	RedisHost  string `json:"redisHost"`
-	RedisPort  string `json:"redisPort"`
 }

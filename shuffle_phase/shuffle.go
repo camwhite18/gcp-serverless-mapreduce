@@ -19,25 +19,26 @@ func Shuffler(ctx context.Context, e event.Event) error {
 	start := time.Now()
 	// Read the data from the event i.e. message pushed from Combine
 	var wordData []tools.WordData
-	client, _, err := tools.ReadPubSubMessage(ctx, e, &wordData)
+	client, attributes, err := tools.ReadPubSubMessage(ctx, e, &wordData)
 	if err != nil {
 		return err
 	}
 	defer client.Close()
-	// Shuffle the words into a map of reducer number a list of WordData objects
+	// Shuffle the words into a map of reducer number to a list of WordData objects
 	shuffledText := shuffle(wordData)
+	// Add each list of WordData objects to the appropriate reducer number
 	err = addToRedis(shuffledText)
 	if err != nil {
 		return err
 	}
 	// Send a message to the controller topic to let it know that the shuffling is complete for the partition
-	//topic := client.Topic(tools.CONTROLLER_TOPIC)
-	//defer topic.Stop()
-	//statusMessage := tools.StatusMessage{
-	//	Id:     attributes["partitionId"],
-	//	Status: tools.STATUS_FINISHED,
-	//}
-	//tools.SendPubSubMessage(ctx, nil, topic, statusMessage, attributes)
+	topic := client.Topic(tools.CONTROLLER_TOPIC)
+	defer topic.Stop()
+	statusMessage := tools.StatusMessage{
+		Id:     attributes["partitionId"],
+		Status: tools.STATUS_FINISHED,
+	}
+	tools.SendPubSubMessage(ctx, nil, topic, statusMessage, attributes)
 	log.Printf("Shuffling took %v", time.Since(start))
 	return nil
 }
@@ -73,9 +74,9 @@ func shuffle(wordData []tools.WordData) map[int][]tools.WordData {
 
 func addToRedis(shuffledText map[int][]tools.WordData) error {
 	// Create a pool of connections to the Redis server
-	if tools.ShufflerRedisPool == nil {
+	if tools.ReducerRedisPool == nil {
 		var err error
-		tools.ShufflerRedisPool, err = tools.InitShufflerRedisPool(os.Getenv("REDIS_HOSTS"))
+		tools.ReducerRedisPool, err = tools.InitReducerRedisPool(os.Getenv("REDIS_HOSTS"))
 		if err != nil {
 			return err
 		}
@@ -87,7 +88,7 @@ func addToRedis(shuffledText map[int][]tools.WordData) error {
 		go func(reducerNum int) {
 			defer wg.Done()
 			// Get a connection from the pool
-			conn := tools.ShufflerRedisPool[reducerNum].Get()
+			conn := tools.ReducerRedisPool[reducerNum].Get()
 			defer conn.Close()
 			for _, value := range shuffledText[reducerNum] {
 				// Add the WordData object to the appropriate reducer number

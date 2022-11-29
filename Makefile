@@ -44,6 +44,12 @@ remove-api-gateway:
 		--api=mapreduce-api \
 		--project=$(GCP_PROJECT)
 
+create-redis:
+	./scripts/create-redis.sh
+
+remove-redis:
+	./scripts/delete-redis.sh
+
 deploy-controller:
 	./controller/deploy-controller.sh
 
@@ -92,7 +98,8 @@ deploy-outputter:
 remove-outputter:
 	./reduce_phase/delete-outputters.sh
 
-deploy: deploy-controller \
+deploy: create-redis \
+		deploy-controller \
 		deploy-init-mapreduce \
 		deploy-splitter \
 		deploy-mapper \
@@ -101,7 +108,8 @@ deploy: deploy-controller \
 		deploy-reducer \
 		deploy-outputter
 
-remove: remove-controller \
+remove: remove-redis \
+		remove-controller \
 		remove-init-mapreduce \
 		remove-splitter \
 		remove-mapper \

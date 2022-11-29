@@ -4,12 +4,15 @@ import (
 	"context"
 	"github.com/cloudevents/sdk-go/v2/event"
 	"gitlab.com/cameron_w20/serverless-mapreduce/tools"
+	"log"
+	"time"
 )
 
 // Combine is a function that is triggered by a message being published to the Combine topic. It receives the list of
 // key-value pairs from the mapper, and does a mini-reduce to group the key-value pairs by key. It requires the message
 // data to be of type []WordData.
 func Combine(ctx context.Context, e event.Event) error {
+	start := time.Now()
 	// Read the data from the event i.e. message pushed from mapper
 	var wordData []tools.WordData
 	client, attributes, err := tools.ReadPubSubMessage(ctx, e, &wordData)
@@ -36,5 +39,6 @@ func Combine(ctx context.Context, e event.Event) error {
 	}
 	// Send the combined key-value pairs to the Shuffler topic
 	tools.SendPubSubMessage(ctx, nil, client.Topic(tools.SHUFFLER_TOPIC), combinedKeyValues, attributes)
+	log.Printf("Combining took %v", time.Since(start))
 	return nil
 }

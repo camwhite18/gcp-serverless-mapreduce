@@ -26,22 +26,3 @@ else
   echo "Failed to delete controller"
   exit 1
 fi
-
-echo "Deleting Redis instance mapreduce-controller"
-if (gcloud redis instances delete mapreduce-controller \
-    --project=serverless-mapreduce \
-    --region=europe-west2 \
-    --quiet) ; then
-  echo "Successfully deleted Redis instance mapreduce-controller"
-else
-  echo "Failed to delete Redis instance mapreduce-controller"
-fi
-
-# Delete the VPC connector
-if (gcloud compute networks vpc-access connectors delete mapreduce-connector \
-    --project=serverless-mapreduce \
-    --region=europe-west2) ; then
-  echo "Successfully deleted VPC connector"
-else
-  echo "Failed to delete VPC connector or it has already been deleted"
-fi

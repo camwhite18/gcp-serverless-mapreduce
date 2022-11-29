@@ -26,14 +26,23 @@ func Mapper(ctx context.Context, e event.Event) error {
 	// Map the words to their sorted form concurrently and store the results in mappedText
 	var mappedText []tools.WordData
 	var wg sync.WaitGroup
-	var mu sync.Mutex
-	for _, word := range text {
-		wg.Add(1)
-		// Map each word in a goroutine
-		go mapWord(&wg, &mu, &mappedText, word)
+	// Create a buffered channel to store the key-value pairs
+	wordChan := make(chan tools.WordData, 1000)
+	go func() {
+		defer close(wordChan)
+		// Iterate over the words in the text and map them to their sorted form
+		for _, word := range text {
+			wg.Add(1)
+			// Map each word in a goroutine
+			go mapWord(&wg, wordChan, word)
+		}
+		// Wait for all the text to be mapped
+		wg.Wait()
+	}()
+	// Read the key-value pairs from the channel and append them to mappedText
+	for wordData := range wordChan {
+		mappedText = append(mappedText, wordData)
 	}
-	// Wait for all the words to be mapped
-	wg.Wait()
 	// Create a client for the combine topic
 	topic := client.Topic(tools.COMBINE_TOPIC)
 	defer topic.Stop()
@@ -45,7 +54,7 @@ func Mapper(ctx context.Context, e event.Event) error {
 
 // mapWord maps a word to its sorted form and stores the result in mappedText. It accepts a pointer to a WaitGroup, a
 // pointer to a sync.Mutex, a pointer to a slice of WordData and a string. It returns nothing.
-func mapWord(wg *sync.WaitGroup, mu *sync.Mutex, mappedText *[]tools.WordData, word string) {
+func mapWord(wg *sync.WaitGroup, wordChan chan tools.WordData, word string) {
 	defer wg.Done()
 	// Do some preprocessing on the word
 	preProcessedWord := preProcessWord(word)
@@ -61,11 +70,8 @@ func mapWord(wg *sync.WaitGroup, mu *sync.Mutex, mappedText *[]tools.WordData, w
 	anagrams := make(map[string]struct{})
 	// Add the word to the map with an empty struct as the value to save memory
 	anagrams[preProcessedWord] = struct{}{}
-	// Lock the mutex to prevent concurrent writes to mappedText
-	mu.Lock()
-	*mappedText = append(*mappedText, tools.WordData{SortedWord: sortedWord, Anagrams: anagrams})
-	// Unlock the mutex once the write is complete to allow other goroutines to write to mappedText
-	mu.Unlock()
+	// Write the key-value pair to the channel
+	wordChan <- tools.WordData{SortedWord: sortedWord, Anagrams: anagrams}
 }
 
 // preProcessWord receives a lowercase word and strips any punctuation from the word. It also removes a word if it is

@@ -1,11 +1,18 @@
 package reduce_phase
 
 import (
+	"cloud.google.com/go/storage"
 	"context"
 	"fmt"
 	"github.com/cloudevents/sdk-go/v2/event"
+	"github.com/gomodule/redigo/redis"
 	"gitlab.com/cameron_w20/serverless-mapreduce/tools"
 	"log"
+	"os"
+	"sort"
+	"strconv"
+	"strings"
+	"sync"
 	"time"
 )
 
@@ -14,44 +21,99 @@ import (
 // message data to be of type []WordData.
 func Reducer(ctx context.Context, e event.Event) error {
 	start := time.Now()
+	_, attributes, err := tools.ReadPubSubMessage(ctx, e, nil)
+	if err != nil {
+		return err
+	}
+	reducerNum := attributes["reducerNum"]
+	log.Printf("Starting reducer %s", reducerNum)
+	reducerNumInt, err := strconv.Atoi(reducerNum)
+	if err != nil {
+		return err
+	}
+	outputBucket := attributes["outputBucket"]
+	fileName := fmt.Sprintf("anagrams-part-%s.txt", reducerNum)
+
 	//Initialize the redis pool if it hasn't been initialized yet
-	if tools.RedisPool == nil {
+	if tools.ReducerRedisPool == nil {
 		var err error
-		tools.RedisPool, err = tools.InitRedisPool()
+		tools.ReducerRedisPool, err = tools.InitReducerRedisPool(os.Getenv("REDIS_HOSTS"))
 		if err != nil {
 			return fmt.Errorf("error initializing redis pool: %v", err)
 		}
 	}
-	// Read the data from the event i.e. message pushed from shuffler
-	var wordDataSlice []tools.WordData
-	client, attributes, err := tools.ReadPubSubMessage(context.Background(), e, &wordDataSlice)
+	// Create a new storage client
+	client, err := storage.NewClient(ctx)
 	if err != nil {
-		return fmt.Errorf("error reading pubsub message: %v", err)
+		return fmt.Errorf("error creating storage client: %v", err)
 	}
 	defer client.Close()
-	// Get a connection from the redis pool
-	conn := tools.RedisPool.Get()
-	defer conn.Close()
-	// Loop through the word data and insert each key value pair into the redis instance
-	for _, wordData := range wordDataSlice {
-		for word := range wordData.Anagrams {
-			// Insert the key value pair into the redis instance, where the key is the sorted word and the value is added
-			// to a set of anagrams
-			_, err := conn.Do("SADD", wordData.SortedWord, word)
-			if err != nil {
-				return fmt.Errorf("error pushing value to set in redis: %v", err)
+	// Create a writer to write to the file in the output bucket
+	writer := client.Bucket(outputBucket).Object(fileName).NewWriter(ctx)
+	defer writer.Close()
+
+	// Get a connection from the redis pool for scanning the keys
+	connScan := tools.ReducerRedisPool[reducerNumInt].Get()
+	defer connScan.Close()
+	// Get a connection from the redis pool for getting the values
+	connGet := tools.ReducerRedisPool[reducerNumInt].Get()
+	defer connGet.Close()
+	// Use scan to iterate over the keys in the redis instance
+	iterator := 0
+	keysChan := make(chan string)
+	go func() {
+		defer close(keysChan)
+		for {
+			if arr, err := redis.Values(connScan.Do("SCAN", iterator)); err != nil {
+				log.Printf("error scanning redis: %v", err)
+			} else {
+				iterator, _ = redis.Int(arr[0], nil)
+				keys, _ := redis.Strings(arr[1], nil)
+				for _, key := range keys {
+					keysChan <- key
+				}
+			}
+
+			if iterator == 0 {
+				break
 			}
 		}
+	}()
+
+	// Read the keys from the channel and get the values from the redis instance
+	var wg sync.WaitGroup
+	for key := range keysChan {
+		value, err := redis.Strings(connGet.Do("LRANGE", key, 0, -1))
+		if err != nil {
+			log.Printf("error getting value from redis: %v", err)
+		}
+		wg.Add(1)
+		go func(key string) {
+			defer wg.Done()
+			reducedAnagrams := reduceAnagramsAndSort(value)
+			if len(reducedAnagrams) > 1 {
+				_, _ = writer.Write([]byte(fmt.Sprintf("%s: %s\n", key, strings.Join(reducedAnagrams, " "))))
+			}
+		}(key)
 	}
-	// Create a client for the controller topic
-	controllerTopic := client.Topic(tools.CONTROLLER_TOPIC)
-	defer controllerTopic.Stop()
-	statusMessage := tools.StatusMessage{
-		Id:     attributes["partitionId"],
-		Status: tools.STATUS_FINISHED,
+	wg.Wait()
+	_, err = connScan.Do("FLUSHALL")
+	if err != nil {
+		log.Printf("error flushing redis: %v", err)
 	}
-	// Send a message to the controller that the given partition has finished being processed
-	tools.SendPubSubMessage(ctx, nil, controllerTopic, statusMessage, attributes)
-	log.Printf("Reducer took %v", time.Since(start))
+	log.Printf("reducer %s took %v", reducerNum, time.Since(start))
 	return nil
+}
+
+func reduceAnagramsAndSort(values []string) []string {
+	var reducedAnagrams []string
+	var anagramMap = make(map[string]struct{})
+	for _, value := range values {
+		anagramMap[value] = struct{}{}
+	}
+	for key := range anagramMap {
+		reducedAnagrams = append(reducedAnagrams, key)
+	}
+	sort.Strings(reducedAnagrams)
+	return reducedAnagrams
 }

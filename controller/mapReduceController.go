@@ -7,7 +7,9 @@ import (
 	"github.com/cloudevents/sdk-go/v2/event"
 	"github.com/gomodule/redigo/redis"
 	"gitlab.com/cameron_w20/serverless-mapreduce/tools"
+	"os"
 	"strconv"
+	"sync"
 )
 
 // Controller is a function that is triggered by a message being published to the controller topic. It is triggered by the
@@ -18,7 +20,7 @@ func Controller(ctx context.Context, e event.Event) error {
 	//Initialize the controller redis pool if it hasn't been initialized yet
 	if tools.RedisPool == nil {
 		var err error
-		tools.RedisPool, err = tools.InitRedisPool()
+		tools.RedisPool, err = tools.InitRedisPool(os.Getenv("REDIS_HOST"))
 		if err != nil {
 			return fmt.Errorf("error initializing redis pool: %v", err)
 		}
@@ -35,9 +37,9 @@ func Controller(ctx context.Context, e event.Event) error {
 	defer conn.Close()
 	if statusMessage.Status == tools.STATUS_STARTED {
 		// If the status is "started", then we need to add the partition uuid to each "started-reducer-{0,..,N-1}" set in redis
-		err = addUUIDToRedisSet(conn, statusMessage.Id)
+		_, err := conn.Do("SADD", "started-processing", statusMessage.Id)
 		if err != nil {
-			return fmt.Errorf("error adding uuid to redis set: %v", err)
+			return fmt.Errorf("error pushing value to set in redis: %v", err)
 		}
 	} else if statusMessage.Status == tools.STATUS_FINISHED {
 		// If the status is "finished", then we need to remove the partition uuid from "started-reducer-X" set in redis
@@ -50,38 +52,39 @@ func Controller(ctx context.Context, e event.Event) error {
 	return nil
 }
 
-// addUUIDToRedisSet adds the id to each "started-reducer-{0,..,N-1}" set in redis
-func addUUIDToRedisSet(conn redis.Conn, id string) error {
-	// For each reducer, add the partition uuid to the "started-reducer-X" set in redis
-	for i := 0; i < tools.NO_OF_REDUCER_INSTANCES; i++ {
-		_, err := conn.Do("SADD", "started-reducer-"+strconv.Itoa(i), id)
-		if err != nil {
-			return fmt.Errorf("error pushing value to set in redis: %v", err)
-		}
-	}
-	return nil
-}
-
 // removeUUIDFromRedisSet removes the id from the "started-reducer-X" set in redis and checks if the set is empty. If it is
 // empty, then it sends a message to the outputter to start.
 func removeUUIDFromRedisSet(ctx context.Context, conn redis.Conn, client *pubsub.Client, attributes map[string]string,
 	id string) error {
 	// If the status is "finished", then we remove the partition uuid from the "started-reducer-X" set in redis
-	_, err := conn.Do("SREM", "started-reducer-"+attributes["reducerNum"], id)
+	_, err := conn.Do("SREM", "started-processing", id)
 	if err != nil {
 		return fmt.Errorf("error removing value from set in redis: %v", err)
 	}
 	// Check if the "started-reducer-X" set is empty
-	cardinality, err := conn.Do("SCARD", "started-reducer-"+attributes["reducerNum"])
+	cardinality, err := conn.Do("SCARD", "started-processing")
 	if err != nil {
 		return fmt.Errorf("error checking if set is empty: %v", err)
 	}
 	// If the set is empty, then we need to send a message to start generating the output files
 	if cardinality == int64(0) {
-		// Create a client for the controller topic
-		outputterTopic := client.Topic(tools.OUTPUTTER_TOPIC + "-" + attributes["reducerNum"])
-		defer outputterTopic.Stop()
-		tools.SendPubSubMessage(ctx, nil, outputterTopic, nil, attributes)
+		// Send a message to start a reducer on each redis instance
+		reducerTopic := client.Topic(tools.REDUCER_TOPIC)
+		defer reducerTopic.Stop()
+		var wg sync.WaitGroup
+		for i := 0; i < tools.NO_OF_REDUCER_INSTANCES; i++ {
+			wg.Add(1)
+			go func(i int) {
+				reducerAttributes := make(map[string]string)
+				for k, v := range attributes {
+					reducerAttributes[k] = v
+				}
+				reducerAttributes["reducerNum"] = strconv.Itoa(i)
+				// Create a message to send to the reducer
+				tools.SendPubSubMessage(ctx, &wg, reducerTopic, nil, reducerAttributes)
+			}(i)
+		}
+		wg.Wait()
 	}
 	return nil
 }

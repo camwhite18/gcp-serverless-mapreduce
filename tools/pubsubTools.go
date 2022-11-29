@@ -68,16 +68,17 @@ func InitRedisPool(redisHost string) (*redis.Pool, error) {
 	redisAddress := fmt.Sprintf("%s:6379", redisHost)
 
 	// Create a redis pool and return it
-	const maxConnections = 10
+	const maxConnections = 100
 	return &redis.Pool{
-		MaxIdle: maxConnections,
+		MaxActive: maxConnections,
+		MaxIdle:   maxConnections,
 		Dial: func() (redis.Conn, error) {
 			return redis.Dial("tcp", redisAddress)
 		},
 	}, nil
 }
 
-func InitShufflerRedisPool(redisHosts string) ([]*redis.Pool, error) {
+func InitReducerRedisPool(redisHosts string) ([]*redis.Pool, error) {
 	var redisPools []*redis.Pool
 	// Create a redis pool and return it
 	for _, host := range strings.Split(redisHosts, " ") {
