@@ -1,56 +1,44 @@
 package shuffle_phase
 
 import (
-	"cloud.google.com/go/pubsub"
 	"context"
 	"github.com/cloudevents/sdk-go/v2/event"
+	"github.com/gomodule/redigo/redis"
 	"gitlab.com/cameron_w20/serverless-mapreduce/tools"
 	"hash/fnv"
 	"log"
-	"strconv"
+	"os"
 	"sync"
+	"time"
 )
 
 // Shuffler is a function that is triggered by a message being published to the Shuffler topic. It receives a list of
 // WordData objects and shuffles them into a map of reducer number to a list of WordData objects. It then pushes each
 // list of WordData objects to the appropriate reducer topic.
 func Shuffler(ctx context.Context, e event.Event) error {
+	start := time.Now()
 	// Read the data from the event i.e. message pushed from Combine
 	var wordData []tools.WordData
-	client, attributes, err := tools.ReadPubSubMessage(ctx, e, &wordData)
+	client, _, err := tools.ReadPubSubMessage(ctx, e, &wordData)
 	if err != nil {
 		return err
 	}
 	defer client.Close()
 	// Shuffle the words into a map of reducer number a list of WordData objects
 	shuffledText := shuffle(wordData)
-	// Create topic client for each reducer topic
-	var topics []*pubsub.Topic
-	for i := 0; i < tools.NO_OF_REDUCER_INSTANCES; i++ {
-		topics = append(topics, client.Topic(tools.REDUCER_TOPIC+"-"+strconv.Itoa(i)))
+	err = addToRedis(shuffledText)
+	if err != nil {
+		return err
 	}
-	// Stop the topics when done
-	defer func() {
-		for _, topic := range topics {
-			topic.Stop()
-		}
-	}()
-	// Send each list of WordData objects to the appropriate reducer topic concurrently
-	var wg sync.WaitGroup
-	for reducerNum, wordData := range shuffledText {
-		// Create a copy of the attributes to prevent the reducerNum from being overwritten by other goroutines
-		reducerAttributes := make(map[string]string)
-		for k, v := range attributes {
-			reducerAttributes[k] = v
-		}
-		reducerAttributes["reducerNum"] = strconv.Itoa(reducerNum)
-		wg.Add(1)
-		log.Printf("reducerAttributes: %v", reducerAttributes)
-		// Push the list of WordData objects to the appropriate reducer topic
-		go tools.SendPubSubMessage(ctx, &wg, topics[reducerNum], wordData, reducerAttributes)
-	}
-	// Wait for all the messages to be sent
-	wg.Wait()
+	// Send a message to the controller topic to let it know that the shuffling is complete for the partition
+	//topic := client.Topic(tools.CONTROLLER_TOPIC)
+	//defer topic.Stop()
+	//statusMessage := tools.StatusMessage{
+	//	Id:     attributes["partitionId"],
+	//	Status: tools.STATUS_FINISHED,
+	//}
+	//tools.SendPubSubMessage(ctx, nil, topic, statusMessage, attributes)
+	log.Printf("Shuffling took %v", time.Since(start))
 	return nil
 }
 
@@ -81,6 +69,43 @@ func shuffle(wordData []tools.WordData) map[int][]tools.WordData {
 	// Wait for all the words to be added to the map
 	wg.Wait()
 	return shuffledText
+}
+
+func addToRedis(shuffledText map[int][]tools.WordData) error {
+	// Create a pool of connections to the Redis server
+	if tools.ShufflerRedisPool == nil {
+		var err error
+		tools.ShufflerRedisPool, err = tools.InitShufflerRedisPool(os.Getenv("REDIS_HOSTS"))
+		if err != nil {
+			return err
+		}
+	}
+	// Add each list of WordData objects to the appropriate reducer number
+	var wg sync.WaitGroup
+	for reducerNum := range shuffledText {
+		wg.Add(1)
+		go func(reducerNum int) {
+			defer wg.Done()
+			// Get a connection from the pool
+			conn := tools.ShufflerRedisPool[reducerNum].Get()
+			defer conn.Close()
+			for _, value := range shuffledText[reducerNum] {
+				// Add the WordData object to the appropriate reducer number
+				var anagrams []string
+				for word := range value.Anagrams {
+					anagrams = append(anagrams, word)
+				}
+				// Add the word to the appropriate reducer number
+				_, err := conn.Do("LPUSH", redis.Args{}.Add(value.SortedWord).AddFlat(anagrams)...)
+				if err != nil {
+					log.Println(err)
+				}
+			}
+		}(reducerNum)
+	}
+	// Wait for all the words to be added to redis
+	wg.Wait()
+	return nil
 }
 
 // partition takes a word and returns the reducer number it should be sent to by taking the modulus of the
