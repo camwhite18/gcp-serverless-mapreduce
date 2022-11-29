@@ -29,7 +29,7 @@ func OutputAnagrams(ctx context.Context, e event.Event) error {
 	// Initialize the redis pool if it hasn't been initialized yet
 	if tools.RedisPool == nil {
 		var err error
-		tools.RedisPool, err = tools.InitRedisPool()
+		tools.RedisPool, err = tools.InitRedisPool("REDIS_HOST")
 		if err != nil {
 			return fmt.Errorf("error initializing redis pool: %v", err)
 		}

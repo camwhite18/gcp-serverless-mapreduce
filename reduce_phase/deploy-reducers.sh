@@ -31,18 +31,6 @@ for ((i=0;i<num_reducers;i++)) do
     exit 1
   fi
 
-  echo "Creating Redis instance mapreduce-reducer-$i"
-  if (gcloud redis instances create mapreduce-reducer-"$i" \
-      --tier=basic \
-      --region=europe-west2 \
-      --size=1 \
-      --network=default) ; then
-    echo "Successfully created Redis instance mapreduce-reducer-$i"
-  else
-    echo "Failed to create Redis instance mapreduce-reducer-$i"
-    exit 1
-  fi
-
   REDIS_HOST=$(gcloud redis instances describe mapreduce-reducer-"$i" \
                 --region=europe-west2 \
                 --format="value(host)")
