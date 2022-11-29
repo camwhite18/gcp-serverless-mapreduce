@@ -56,8 +56,10 @@ func splitFile(ctx context.Context, bucketName, fileName string) ([][]string, er
 	data = removeBookHeaderAndFooter(data)
 	// Split the file into a list of words
 	splitText := strings.Fields(string(data))
+	// Remove non-unique words:
+	uniqueSplitText := removeDuplicateWords(splitText)
 	// Partition the file since this will speed up the map phase
-	partitionedText := partitionFile(splitText, tools.MAX_MESSAGE_SIZE_BYTES)
+	partitionedText := partitionFile(uniqueSplitText, tools.MAX_MESSAGE_SIZE_BYTES)
 	return partitionedText, nil
 }
 
@@ -102,6 +104,22 @@ func removeBookHeaderAndFooter(data []byte) []byte {
 		data = data[:index[0]]
 	}
 	return data
+}
+
+func removeDuplicateWords(text []string) []string {
+	// Create a map to store the unique words
+	uniqueWords := make(map[string]struct{})
+	// Create a slice to store the unique words
+	uniqueWordsSlice := make([]string, 0)
+	// Loop through the words and add the lowercase version to the map
+	for _, word := range text {
+		uniqueWords[strings.ToLower(word)] = struct{}{}
+	}
+	// Loop through the map and add the words to the slice
+	for word := range uniqueWords {
+		uniqueWordsSlice = append(uniqueWordsSlice, word)
+	}
+	return uniqueWordsSlice
 }
 
 // partitionFile splits the given text into partitions of a given size and returns the partitions as a slice of
