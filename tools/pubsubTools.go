@@ -8,7 +8,7 @@ import (
 	"github.com/cloudevents/sdk-go/v2/event"
 	"github.com/gomodule/redigo/redis"
 	"log"
-	"os"
+	"strings"
 	"sync"
 )
 
@@ -64,17 +64,8 @@ func SendPubSubMessage(ctx context.Context, wg *sync.WaitGroup, topic *pubsub.To
 
 // InitRedisPool creates a redis pool from the given redis address. Uses the REDIS_HOST and REDIS_PORT environment
 // variables if they are set.
-func InitRedisPool() (*redis.Pool, error) {
-	// Get the redis host and port from the environment variables
-	redisHost := os.Getenv("REDIS_HOST")
-	if redisHost == "" {
-		return nil, fmt.Errorf("REDIS_HOST not set")
-	}
-	redisPort := os.Getenv("REDIS_PORT")
-	if redisPort == "" {
-		return nil, fmt.Errorf("REDIS_PORT not set")
-	}
-	redisAddress := fmt.Sprintf("%s:%s", redisHost, redisPort)
+func InitRedisPool(redisHost string) (*redis.Pool, error) {
+	redisAddress := fmt.Sprintf("%s:6379", redisHost)
 
 	// Create a redis pool and return it
 	const maxConnections = 10
@@ -84,4 +75,17 @@ func InitRedisPool() (*redis.Pool, error) {
 			return redis.Dial("tcp", redisAddress)
 		},
 	}, nil
+}
+
+func InitShufflerRedisPool(redisHosts string) ([]*redis.Pool, error) {
+	var redisPools []*redis.Pool
+	// Create a redis pool and return it
+	for _, host := range strings.Split(redisHosts, " ") {
+		pool, err := InitRedisPool(host)
+		if err != nil {
+			return nil, err
+		}
+		redisPools = append(redisPools, pool)
+	}
+	return redisPools, nil
 }

@@ -23,6 +23,7 @@ const STATUS_STARTED = "started"
 const STATUS_FINISHED = "finished"
 
 var RedisPool *redis.Pool
+var ShufflerRedisPool []*redis.Pool
 
 type MessagePublishedData struct {
 	Message PubSubMessage
@@ -46,4 +47,10 @@ type WordData struct {
 type SplitterData struct {
 	BucketName string `json:"bucketName"`
 	FileName   string `json:"fileName"`
+}
+
+type ReducerData struct {
+	ReducerNum string `json:"reducerNum"`
+	RedisHost  string `json:"redisHost"`
+	RedisPort  string `json:"redisPort"`
 }
