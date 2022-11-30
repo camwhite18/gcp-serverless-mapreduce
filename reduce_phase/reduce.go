@@ -52,15 +52,27 @@ func Reducer(ctx context.Context, e event.Event) error {
 	writer := client.Bucket(outputBucket).Object(fileName).NewWriter(ctx)
 	defer writer.Close()
 
-	// Get a connection from the redis pool for scanning the keys
-	connScan := tools.ReducerRedisPool[reducerNumInt].Get()
-	defer connScan.Close()
-	// Get a connection from the redis pool for getting the values
-	connGet := tools.ReducerRedisPool[reducerNumInt].Get()
-	defer connGet.Close()
-	// Use scan to iterate over the keys in the redis instance
-	iterator := 0
+	// Create a channel to read the keys from redis
 	keysChan := make(chan string)
+	// Read the keys from redis
+	conn := readKeysFromRedis(keysChan, reducerNumInt)
+	defer conn.Close()
+	// Get the values for each key from the redis instance
+	var wg sync.WaitGroup
+	readAnagramsFromRedis(&wg, keysChan, writer, reducerNumInt)
+	wg.Wait()
+	_, err = conn.Do("FLUSHALL")
+	if err != nil {
+		log.Printf("error flushing redis: %v", err)
+	}
+	log.Printf("reducer %s took %v", reducerNum, time.Since(start))
+	return nil
+}
+
+func readKeysFromRedis(keysChan chan string, reducerNum int) redis.Conn {
+	// Get a connection from the redis pool for scanning the keys
+	connScan := tools.ReducerRedisPool[reducerNum].Get()
+	iterator := 0
 	go func() {
 		defer close(keysChan)
 		for {
@@ -79,9 +91,14 @@ func Reducer(ctx context.Context, e event.Event) error {
 			}
 		}
 	}()
+	return connScan
+}
 
-	// Read the keys from the channel and get the values from the redis instance
-	var wg sync.WaitGroup
+func readAnagramsFromRedis(wg *sync.WaitGroup, keysChan chan string, writer *storage.Writer, reducerNum int) {
+	defer wg.Done()
+	// Get a connection from the redis pool for getting the values
+	connGet := tools.ReducerRedisPool[reducerNum].Get()
+	defer connGet.Close()
 	for key := range keysChan {
 		value, err := redis.Strings(connGet.Do("LRANGE", key, 0, -1))
 		if err != nil {
@@ -96,13 +113,6 @@ func Reducer(ctx context.Context, e event.Event) error {
 			}
 		}(key)
 	}
-	wg.Wait()
-	_, err = connScan.Do("FLUSHALL")
-	if err != nil {
-		log.Printf("error flushing redis: %v", err)
-	}
-	log.Printf("reducer %s took %v", reducerNum, time.Since(start))
-	return nil
 }
 
 func reduceAnagramsAndSort(values []string) []string {

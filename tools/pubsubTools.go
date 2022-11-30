@@ -66,7 +66,6 @@ func SendPubSubMessage(ctx context.Context, wg *sync.WaitGroup, topic *pubsub.To
 // variables if they are set.
 func InitRedisPool(redisHost string) (*redis.Pool, error) {
 	redisAddress := fmt.Sprintf("%s:6379", redisHost)
-
 	// Create a redis pool and return it
 	const maxConnections = 100
 	return &redis.Pool{
