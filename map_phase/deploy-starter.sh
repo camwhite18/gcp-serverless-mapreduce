@@ -9,18 +9,18 @@ if ! [ -x "$(command -v gcloud)" ]; then
   exit 1
 fi
 
-echo "Deploying init-mapreduce"
-if (gcloud functions deploy init-mapreduce \
+echo "Deploying starter"
+if (gcloud functions deploy starter \
     --gen2 \
     --runtime=go116 \
     --trigger-http \
     --source=. \
-    --entry-point Service \
+    --entry-point Starter \
     --region="$GCP_REGION" \
     --memory=512MB \
     --project="$GCP_PROJECT") ; then
-  echo "Successfully deployed init-mapreduce"
+  echo "Successfully deployed starter"
 else
-  echo "Failed to deploy init-mapreduce"
+  echo "Failed to deploy starter"
   exit 1
 fi

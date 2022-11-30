@@ -9,13 +9,13 @@ if ! [ -x "$(command -v gcloud)" ]; then
   exit 1
 fi
 
-echo "Deleting init-mapreduce"
-if (gcloud functions delete init-mapreduce \
+echo "Deleting starter"
+if (gcloud functions delete starter \
   --gen2 \
   --region="$GCP_REGION" \
   --project="$GCP_PROJECT" \
   --quiet) ; then
-  echo "Successfully deleted init-mapreduce"
+  echo "Successfully deleted starter"
 else
-  echo "Failed to delete init-mapreduce"
+  echo "Failed to delete starter"
 fi

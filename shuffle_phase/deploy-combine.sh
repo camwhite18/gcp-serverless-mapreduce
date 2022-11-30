@@ -9,34 +9,34 @@ if ! [ -x "$(command -v gcloud)" ]; then
   exit 1
 fi
 
-# Create the topic and deploy the combine
-echo "Creating topic mapreduce-combine"
-if (gcloud pubsub topics create mapreduce-combine \
+# Create the topic and deploy the combiner
+echo "Creating topic mapreduce-combiner"
+if (gcloud pubsub topics create mapreduce-combiner \
   --project="$GCP_PROJECT") ; then
-  echo "Successfully created topic mapreduce-combine"
+  echo "Successfully created topic mapreduce-combiner"
 else
-  echo "Failed to create topic mapreduce-combine"
+  echo "Failed to create topic mapreduce-combiner"
   exit 1
 fi
 
-echo "Deploying combine"
-if (gcloud functions deploy combine \
+echo "Deploying combiner"
+if (gcloud functions deploy combiner \
     --gen2 \
     --runtime=go116 \
-    --trigger-topic mapreduce-combine \
+    --trigger-topic mapreduce-combiner \
     --source=. \
-    --entry-point Combine \
+    --entry-point Combiner \
     --region="$GCP_REGION" \
     --memory=512MB \
     --project="$GCP_PROJECT") ; then
-  echo "Successfully deployed combine"
+  echo "Successfully deployed combiner"
 else
-  echo "Failed to deploy combine"
+  echo "Failed to deploy combiner"
   exit 1
 fi
 
 # Change the backoff delay of the subscription to start at 1 second
-subscription=$(gcloud pubsub subscriptions list | grep "eventarc-$GCP_REGION-combine" | cut -c 7-)
+subscription=$(gcloud pubsub subscriptions list | grep "eventarc-$GCP_REGION-combiner" | cut -c 7-)
 echo "Changing backoff delay of subscription $subscription"
 gcloud pubsub subscriptions update "$subscription" \
   --project="$GCP_PROJECT" \
