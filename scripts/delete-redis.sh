@@ -11,8 +11,8 @@ for ((i=0;i<num_reducers;i++)) do
   ( \
   echo "Deleting Redis instance mapreduce-redis-$i"
   if (gcloud redis instances delete mapreduce-redis-"$i" \
-      --region=europe-west2 \
-      --project=serverless-mapreduce \
+      --region="$GCP_REGION" \
+      --project="$GCP_PROJECT" \
       --quiet) ; then
     echo "Successfully deleted Redis instance mapreduce-redis-$i"
   else
@@ -24,8 +24,8 @@ done
 ( \
 echo "Deleting Redis instance mapreduce-controller"
 if (gcloud redis instances delete mapreduce-controller \
-    --project=serverless-mapreduce \
-    --region=europe-west2 \
+    --project="$GCP_PROJECT" \
+    --region="$GCP_REGION" \
     --quiet) ; then
   echo "Successfully deleted Redis instance mapreduce-controller"
 else
@@ -35,8 +35,8 @@ fi
 ( \
 # Delete the VPC connector
 if (gcloud compute networks vpc-access connectors delete mapreduce-connector \
-    --project=serverless-mapreduce \
-    --region=europe-west2 \
+    --project="$GCP_PROJECT" \
+    --region="$GCP_REGION" \
     --quiet) ; then
   echo "Successfully deleted VPC connector"
 else

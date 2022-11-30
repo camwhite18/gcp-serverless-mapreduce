@@ -8,9 +8,9 @@ fi
 
 #Create VPC connector for serverless VPC access to Redis
 if (gcloud compute networks vpc-access connectors create mapreduce-connector \
-    --project=serverless-mapreduce \
+    --project="$GCP_PROJECT" \
     --network=default \
-    --region=europe-west2 \
+    --region="$GCP_REGION" \
     --max-instances=3 \
     --range=10.8.0.0/28) ; then
   echo "Successfully created VPC connector"
@@ -22,7 +22,7 @@ fi
 echo "Creating Redis instance mapreduce-controller"
 if (gcloud redis instances create mapreduce-controller \
     --tier=basic \
-    --region=europe-west2 \
+    --region="$GCP_REGION" \
     --size=1 \
     --network=default) ; then
   echo "Successfully created Redis instance mapreduce-controller"
@@ -39,7 +39,7 @@ for ((i=0;i<num_reducers;i++)) do
   echo "Creating Redis instance mapreduce-redis-$i"
   if (gcloud redis instances create mapreduce-redis-"$i" \
       --tier=basic \
-      --region=europe-west2 \
+      --region="$GCP_REGION" \
       --size=1 \
       --network=default) ; then
     echo "Successfully created Redis instance mapreduce-redis-$i"

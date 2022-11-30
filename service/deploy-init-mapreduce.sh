@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# Read env file
+source .env
+
 # Check if gcloud is installed
 if ! [ -x "$(command -v gcloud)" ]; then
   echo 'Error: gcloud is not installed.' >&2
@@ -13,9 +16,9 @@ if (gcloud functions deploy init-mapreduce \
     --trigger-http \
     --source=. \
     --entry-point Service \
-    --region=europe-west2 \
+    --region="$GCP_REGION" \
     --memory=512MB \
-    --project=serverless-mapreduce) ; then
+    --project="$GCP_PROJECT") ; then
   echo "Successfully deployed init-mapreduce"
 else
   echo "Failed to deploy init-mapreduce"

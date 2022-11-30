@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# Read env file
+source .env
+
 # Check if gcloud is installed
 if ! [ -x "$(command -v gcloud)" ]; then
   echo 'Error: gcloud is not installed.' >&2
@@ -9,7 +12,7 @@ fi
 # Create the topic and deploy the shuffler
 echo "Creating topic mapreduce-shuffler"
 if (gcloud pubsub topics create mapreduce-shuffler \
-  --project=serverless-mapreduce) ; then
+  --project="$GCP_PROJECT") ; then
   echo "Successfully created topic mapreduce-shuffler"
 else
   echo "Failed to create topic mapreduce-shuffler"
@@ -18,11 +21,11 @@ fi
 
 num_reducers=5
 REDIS_HOSTS=$(gcloud redis instances describe mapreduce-redis-0 \
-              --region=europe-west2 \
+              --region="$GCP_REGION" \
               --format="value(host)")
 for ((i=1;i<num_reducers;i++)) do
   REDIS_HOST=$(gcloud redis instances describe mapreduce-redis-"$i" \
-                --region=europe-west2 \
+                --region="$GCP_REGION" \
                 --format="value(host)")
   REDIS_HOSTS+=" $REDIS_HOST"
 done
@@ -34,10 +37,10 @@ if (gcloud functions deploy shuffler \
     --trigger-topic mapreduce-shuffler \
     --source=. \
     --entry-point Shuffler \
-    --region=europe-west2 \
+    --region="$GCP_REGION" \
     --memory=512MB \
-    --project=serverless-mapreduce \
-    --vpc-connector=projects/serverless-mapreduce/locations/europe-west2/connectors/mapreduce-connector \
+    --project="$GCP_PROJECT" \
+    --vpc-connector=projects/"$GCP_PROJECT"/locations/"$GCP_REGION"/connectors/mapreduce-connector \
     --set-env-vars=REDIS_HOSTS="$REDIS_HOSTS"
     ) ; then
   echo "Successfully deployed shuffler"
@@ -46,9 +49,9 @@ else
 fi
 
 # Change the backoff delay of the subscription to start at 1 second
-subscription=$(gcloud pubsub subscriptions list | grep "eventarc-europe-west2-shuffler" | cut -c 7-)
+subscription=$(gcloud pubsub subscriptions list | grep "eventarc-$GCP_REGION-shuffler" | cut -c 7-)
 echo "Changing backoff delay of subscription $subscription"
 gcloud pubsub subscriptions update "$subscription" \
-  --project=serverless-mapreduce \
+  --project="$GCP_PROJECT" \
   --min-retry-delay=1s \
   --max-retry-delay=10s
