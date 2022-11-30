@@ -19,7 +19,8 @@ echo "Deleting mapper"
 if (gcloud functions delete mapper \
   --gen2 \
   --region=europe-west2 \
-  --project=serverless-mapreduce) ; then
+  --project=serverless-mapreduce \
+  --quiet) ; then
   echo "Successfully deleted mapper"
 else
   echo "Failed to delete mapper"

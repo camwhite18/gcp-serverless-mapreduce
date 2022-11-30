@@ -19,7 +19,8 @@ echo "Deleting splitter"
 if (gcloud functions delete splitter \
   --gen2 \
   --region=europe-west2 \
-  --project=serverless-mapreduce) ; then
+  --project=serverless-mapreduce \
+  --quiet) ; then
   echo "Successfully deleted splitter"
 else
   echo "Failed to delete splitter"

@@ -10,7 +10,8 @@ echo "Deleting init-mapreduce"
 if (gcloud functions delete init-mapreduce \
   --gen2 \
   --region=europe-west2 \
-  --project=serverless-mapreduce) ; then
+  --project=serverless-mapreduce \
+  --quiet) ; then
   echo "Successfully deleted init-mapreduce"
 else
   echo "Failed to delete init-mapreduce"

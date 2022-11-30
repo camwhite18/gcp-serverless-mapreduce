@@ -19,7 +19,8 @@ echo "Deleting combine"
 if (gcloud functions delete combine \
   --gen2 \
   --region=europe-west2 \
-  --project=serverless-mapreduce) ; then
+  --project=serverless-mapreduce \
+  --quiet) ; then
   echo "Successfully deleted combine"
 else
   echo "Failed to delete combine"

@@ -6,18 +6,6 @@ if ! [ -x "$(command -v gcloud)" ]; then
   exit 1
 fi
 
-# Create VPC connector for serverless VPC access to Redis
-if (gcloud compute networks vpc-access connectors create mapreduce-connector \
-    --project=serverless-mapreduce \
-    --network=default \
-    --region=europe-west2 \
-    --max-instances=3 \
-    --range=10.8.0.0/28) ; then
-  echo "Successfully created VPC connector"
-else
-  echo "Failed to create VPC connector or it already exists"
-fi
-
 # Create the topic, redis instance and deploy the controller
 echo "Creating topic mapreduce-controller"
 if (gcloud pubsub topics create mapreduce-controller \
