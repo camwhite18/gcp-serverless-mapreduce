@@ -3,7 +3,6 @@ package shuffle_phase
 import (
 	"context"
 	"github.com/cloudevents/sdk-go/v2/event"
-	"github.com/gomodule/redigo/redis"
 	"gitlab.com/cameron_w20/serverless-mapreduce/tools"
 	"hash/fnv"
 	"log"
@@ -27,7 +26,7 @@ func Shuffler(ctx context.Context, e event.Event) error {
 	// Shuffle the words into a map of reducer number to a list of WordData objects
 	shuffledText := shuffle(wordData)
 	// Add each list of WordData objects to the appropriate reducer number
-	err = addToRedis(shuffledText)
+	err = addToRedis(ctx, shuffledText)
 	if err != nil {
 		return err
 	}
@@ -72,7 +71,7 @@ func shuffle(wordData []tools.WordData) map[int][]tools.WordData {
 	return shuffledText
 }
 
-func addToRedis(shuffledText map[int][]tools.WordData) error {
+func addToRedis(ctx context.Context, shuffledText map[int][]tools.WordData) error {
 	// Create a pool of connections to the Redis server
 	if tools.ReducerRedisPool == nil {
 		var err error
@@ -88,18 +87,16 @@ func addToRedis(shuffledText map[int][]tools.WordData) error {
 		go func(reducerNum int) {
 			defer wg.Done()
 			// Get a connection from the pool
-			conn := tools.ReducerRedisPool[reducerNum].Get()
-			defer conn.Close()
 			for _, value := range shuffledText[reducerNum] {
 				// Add the WordData object to the appropriate reducer number
-				var anagrams []string
+				var anagrams []interface{}
 				for word := range value.Anagrams {
 					anagrams = append(anagrams, word)
 				}
 				// Add the word to the appropriate reducer number
-				_, err := conn.Do("LPUSH", redis.Args{}.Add(value.SortedWord).AddFlat(anagrams)...)
-				if err != nil {
-					log.Println(err)
+				res := tools.ReducerRedisPool[reducerNum].LPush(ctx, value.SortedWord, anagrams...)
+				if res.Err() != nil {
+					log.Println(res.Err())
 				}
 			}
 		}(reducerNum)

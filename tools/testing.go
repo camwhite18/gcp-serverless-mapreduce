@@ -6,7 +6,6 @@ import (
 	"context"
 	"google.golang.org/api/iterator"
 	"os"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -148,21 +147,10 @@ func CreateTestStorage(tb testing.TB) func(tb testing.TB) {
 
 func SetupRedisTest(tb testing.TB) func(tb testing.TB) {
 	// Setup test
-	var exsitingRedisHosts []string
-	var exsitingRedisPorts []string
-	for i := 0; i < NO_OF_REDUCER_INSTANCES; i++ {
-		// Modify the REDIS_HOST environment variable to point to the redis instance
-		exsitingRedisHosts = append(exsitingRedisHosts, os.Getenv("REDIS_REDUCER_HOST-"+strconv.Itoa(i)))
-		err := os.Setenv("REDIS_REDUCER_HOST-"+strconv.Itoa(i), "localhost")
-		if err != nil {
-			tb.Fatalf("Error setting environment variable: %v", err)
-		}
-		// Modify the REDIS_PORT environment variable to point to the redis instance
-		exsitingRedisPorts = append(exsitingRedisPorts, os.Getenv("REDIS_REDUCER_PORT-"+strconv.Itoa(i)))
-		err = os.Setenv("REDIS_REDUCER_PORT-"+strconv.Itoa(i), "6379")
-		if err != nil {
-			tb.Fatalf("Error setting environment variable: %v", err)
-		}
+	existingRedisHostsVal := os.Getenv("REDIS_HOSTS")
+	err := os.Setenv("REDIS_HOSTS", "localhost localhost localhost localhost localhost")
+	if err != nil {
+		tb.Fatalf("Error setting environment variable: %v", err)
 	}
 
 	return func(tb testing.TB) {
@@ -174,18 +162,6 @@ func SetupRedisTest(tb testing.TB) func(tb testing.TB) {
 		//	tb.Fatalf("Error getting data from redis: %v", err)
 		//}
 		// Reset the REDIS_HOST environment variable
-		for _, existingRedisHostVal := range exsitingRedisHosts {
-			err := os.Setenv("REDIS_HOST", existingRedisHostVal)
-			if err != nil {
-				tb.Fatalf("Error setting environment variable: %v", err)
-			}
-		}
-		// Reset the REDIS_PORT environment variable
-		for _, existingRedisPortVal := range exsitingRedisPorts {
-			err := os.Setenv("REDIS_PORT", existingRedisPortVal)
-			if err != nil {
-				tb.Fatalf("Error setting environment variable: %v", err)
-			}
-		}
+		err = os.Setenv("REDIS_HOSTS", existingRedisHostsVal)
 	}
 }

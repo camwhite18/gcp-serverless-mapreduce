@@ -18,6 +18,7 @@ else
   echo "Failed to create VPC connector or it already exists"
 fi
 
+( \
 echo "Creating Redis instance mapreduce-controller"
 if (gcloud redis instances create mapreduce-controller \
     --tier=basic \
@@ -29,7 +30,9 @@ else
   echo "Failed to create Redis instance mapreduce-controller="
   exit 1
 fi
+) &
 
+( \
 num_reducers=5
 for ((i=0;i<num_reducers;i++)) do
   ( \
@@ -46,3 +49,5 @@ for ((i=0;i<num_reducers;i++)) do
   fi
   ) &
 done; wait
+)
+wait

@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/cloudevents/sdk-go/v2/event"
-	"github.com/gomodule/redigo/redis"
 	"gitlab.com/cameron_w20/serverless-mapreduce/tools"
 	"os"
 	"strconv"
@@ -33,18 +32,22 @@ func Controller(ctx context.Context, e event.Event) error {
 		return fmt.Errorf("error reading pubsub message: %v", err)
 	}
 	// Get a connection from the redis pool
-	conn := tools.RedisPool.Get()
-	defer conn.Close()
+	//conn := tools.RedisPool.Get()
+	//defer conn.Close()
 	if statusMessage.Status == tools.STATUS_STARTED {
 		// If the status is "started", then we need to add the partition uuid to each "started-reducer-{0,..,N-1}" set in redis
-		_, err := conn.Do("SADD", "started-processing", statusMessage.Id)
-		if err != nil {
-			return fmt.Errorf("error pushing value to set in redis: %v", err)
+		//_, err := conn.Do("SADD", "started-processing", statusMessage.Id)
+		//if err != nil {
+		//	return fmt.Errorf("error pushing value to set in redis: %v", err)
+		//}
+		res := tools.RedisPool.SAdd(ctx, "started-processing", statusMessage.Id)
+		if res.Err() != nil {
+			return fmt.Errorf("error pushing value to set in redis: %v", res.Err())
 		}
 	} else if statusMessage.Status == tools.STATUS_FINISHED {
 		// If the status is "finished", then we need to remove the partition uuid from "started-reducer-X" set in redis
 		// and check if the set is empty. If it is empty, then we need to send a message to start generating the output files
-		err = removeUUIDFromRedisSet(ctx, conn, client, attributes, statusMessage.Id)
+		err = removeUUIDFromRedisSet(ctx, client, attributes, statusMessage.Id)
 		if err != nil {
 			return fmt.Errorf("error removing uuid from redis set: %v", err)
 		}
@@ -54,15 +57,15 @@ func Controller(ctx context.Context, e event.Event) error {
 
 // removeUUIDFromRedisSet removes the id from the "started-reducer-X" set in redis and checks if the set is empty. If it is
 // empty, then it sends a message to the outputter to start.
-func removeUUIDFromRedisSet(ctx context.Context, conn redis.Conn, client *pubsub.Client, attributes map[string]string,
+func removeUUIDFromRedisSet(ctx context.Context, client *pubsub.Client, attributes map[string]string,
 	id string) error {
 	// If the status is "finished", then we remove the partition uuid from the "started-reducer-X" set in redis
-	_, err := conn.Do("SREM", "started-processing", id)
-	if err != nil {
-		return fmt.Errorf("error removing value from set in redis: %v", err)
+	res := tools.RedisPool.SRem(ctx, "started-processing", id)
+	if res.Err() != nil {
+		return fmt.Errorf("error removing value from set in redis: %v", res.Err())
 	}
 	// Check if the "started-reducer-X" set is empty
-	cardinality, err := conn.Do("SCARD", "started-processing")
+	cardinality, err := tools.RedisPool.SCard(ctx, "started-processing").Result()
 	if err != nil {
 		return fmt.Errorf("error checking if set is empty: %v", err)
 	}

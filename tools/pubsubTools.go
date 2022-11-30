@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/cloudevents/sdk-go/v2/event"
-	"github.com/gomodule/redigo/redis"
+	"github.com/go-redis/redis/v8"
 	"log"
 	"strings"
 	"sync"
@@ -64,21 +64,46 @@ func SendPubSubMessage(ctx context.Context, wg *sync.WaitGroup, topic *pubsub.To
 
 // InitRedisPool creates a redis pool from the given redis address. Uses the REDIS_HOST and REDIS_PORT environment
 // variables if they are set.
-func InitRedisPool(redisHost string) (*redis.Pool, error) {
+//func InitRedisPool(redisHost string) (*redis.Pool, error) {
+//	redisAddress := fmt.Sprintf("%s:6379", redisHost)
+//	// Create a redis pool and return it
+//	const maxConnections = 100
+//	return &redis.Pool{
+//		MaxActive: maxConnections,
+//		MaxIdle:   maxConnections,
+//		Dial: func() (redis.Conn, error) {
+//			return redis.Dial("tcp", redisAddress)
+//		},
+//	}, nil
+//}
+//
+//func InitReducerRedisPool(redisHosts string) ([]*redis.Pool, error) {
+//	var redisPools []*redis.Pool
+//	// Create a redis pool and return it
+//	for _, host := range strings.Split(redisHosts, " ") {
+//		pool, err := InitRedisPool(host)
+//		if err != nil {
+//			return nil, err
+//		}
+//		redisPools = append(redisPools, pool)
+//	}
+//	return redisPools, nil
+//}
+
+func InitRedisPool(redisHost string) (*redis.Client, error) {
 	redisAddress := fmt.Sprintf("%s:6379", redisHost)
 	// Create a redis pool and return it
 	const maxConnections = 100
-	return &redis.Pool{
-		MaxActive: maxConnections,
-		MaxIdle:   maxConnections,
-		Dial: func() (redis.Conn, error) {
-			return redis.Dial("tcp", redisAddress)
-		},
-	}, nil
+	return redis.NewClient(&redis.Options{
+		Addr:     redisAddress,
+		Password: "",
+		DB:       0,
+		PoolSize: maxConnections,
+	}), nil
 }
 
-func InitReducerRedisPool(redisHosts string) ([]*redis.Pool, error) {
-	var redisPools []*redis.Pool
+func InitReducerRedisPool(redisHosts string) ([]*redis.Client, error) {
+	var redisPools []*redis.Client
 	// Create a redis pool and return it
 	for _, host := range strings.Split(redisHosts, " ") {
 		pool, err := InitRedisPool(host)

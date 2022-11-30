@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/cloudevents/sdk-go/v2/event"
-	"github.com/gomodule/redigo/redis"
 	"gitlab.com/cameron_w20/serverless-mapreduce/tools"
 	"log"
 	"os"
@@ -55,59 +54,42 @@ func Reducer(ctx context.Context, e event.Event) error {
 	// Create a channel to read the keys from redis
 	keysChan := make(chan string)
 	// Read the keys from redis
-	conn := readKeysFromRedis(keysChan, reducerNumInt)
-	defer conn.Close()
+	readKeysFromRedis(ctx, keysChan, reducerNumInt)
 	// Get the values for each key from the redis instance
 	var wg sync.WaitGroup
-	readAnagramsFromRedis(&wg, keysChan, writer, reducerNumInt)
+	readAnagramsFromRedis(ctx, &wg, keysChan, writer, reducerNumInt)
 	wg.Wait()
-	_, err = conn.Do("FLUSHALL")
-	if err != nil {
+	res := tools.ReducerRedisPool[reducerNumInt].FlushAll(ctx)
+	if res.Err() != nil {
 		log.Printf("error flushing redis: %v", err)
 	}
 	log.Printf("reducer %s took %v", reducerNum, time.Since(start))
 	return nil
 }
 
-func readKeysFromRedis(keysChan chan string, reducerNum int) redis.Conn {
-	// Get a connection from the redis pool for scanning the keys
-	connScan := tools.ReducerRedisPool[reducerNum].Get()
-	iterator := 0
+func readKeysFromRedis(ctx context.Context, keysChan chan string, reducerNum int) {
 	go func() {
 		defer close(keysChan)
-		for {
-			if arr, err := redis.Values(connScan.Do("SCAN", iterator)); err != nil {
-				log.Printf("error scanning redis: %v", err)
-			} else {
-				iterator, _ = redis.Int(arr[0], nil)
-				keys, _ := redis.Strings(arr[1], nil)
-				for _, key := range keys {
-					keysChan <- key
-				}
-			}
-
-			if iterator == 0 {
-				break
-			}
+		iter := tools.ReducerRedisPool[reducerNum].Scan(ctx, 0, "", 100).Iterator()
+		for iter.Next(ctx) {
+			keysChan <- iter.Val()
+		}
+		if err := iter.Err(); err != nil {
+			log.Printf("error scanning redis: %v", err)
 		}
 	}()
-	return connScan
 }
 
-func readAnagramsFromRedis(wg *sync.WaitGroup, keysChan chan string, writer *storage.Writer, reducerNum int) {
-	defer wg.Done()
-	// Get a connection from the redis pool for getting the values
-	connGet := tools.ReducerRedisPool[reducerNum].Get()
-	defer connGet.Close()
+func readAnagramsFromRedis(ctx context.Context, wg *sync.WaitGroup, keysChan chan string, writer *storage.Writer, reducerNum int) {
 	for key := range keysChan {
-		value, err := redis.Strings(connGet.Do("LRANGE", key, 0, -1))
-		if err != nil {
-			log.Printf("error getting value from redis: %v", err)
+		res := tools.ReducerRedisPool[reducerNum].LRange(ctx, key, 0, -1)
+		if res.Err() != nil {
+			log.Printf("error getting value from redis: %v", res.Err())
 		}
 		wg.Add(1)
 		go func(key string) {
 			defer wg.Done()
-			reducedAnagrams := reduceAnagramsAndSort(value)
+			reducedAnagrams := reduceAnagramsAndSort(res.Val())
 			if len(reducedAnagrams) > 1 {
 				_, _ = writer.Write([]byte(fmt.Sprintf("%s: %s\n", key, strings.Join(reducedAnagrams, " "))))
 			}

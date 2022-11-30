@@ -1,7 +1,7 @@
 package tools
 
 import (
-	"github.com/gomodule/redigo/redis"
+	"github.com/go-redis/redis/v8"
 	"time"
 )
 
@@ -21,8 +21,8 @@ const REDUCER_TOPIC = "mapreduce-reducer"
 const STATUS_STARTED = "started"
 const STATUS_FINISHED = "finished"
 
-var RedisPool *redis.Pool
-var ReducerRedisPool []*redis.Pool
+var RedisPool *redis.Client
+var ReducerRedisPool []*redis.Client
 
 type MessagePublishedData struct {
 	Message PubSubMessage

@@ -28,7 +28,7 @@ func TestReducer(t *testing.T) {
 	message := tools.MessagePublishedData{
 		Message: tools.PubSubMessage{
 			Data:       inputDataBytes,
-			Attributes: map[string]string{"outputBucket": tools.OUTPUT_BUCKET_NAME},
+			Attributes: map[string]string{"outputBucket": tools.OUTPUT_BUCKET_NAME, "reducerNum": "1"},
 		},
 	}
 	// Create a CloudEvent to be sent to the mapper
