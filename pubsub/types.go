@@ -1,11 +1,6 @@
-package tools
+package pubsub
 
-import (
-	"github.com/go-redis/redis/v8"
-	"time"
-)
-
-const NO_OF_REDUCER_INSTANCES = 5
+import "time"
 
 const MAX_MESSAGE_SIZE_BYTES = 50000
 const MAX_MESSAGE_COUNT = 100
@@ -21,11 +16,8 @@ const REDUCER_TOPIC = "mapreduce-reducer"
 const STATUS_STARTED = "started"
 const STATUS_FINISHED = "finished"
 
-var RedisPool *redis.Client
-var ReducerRedisPool []*redis.Client
-
 type MessagePublishedData struct {
-	Message PubSubMessage
+	Message PubSubMessage `json:"message"`
 }
 
 type PubSubMessage struct {
@@ -33,14 +25,14 @@ type PubSubMessage struct {
 	Attributes map[string]string `json:"attributes"`
 }
 
-type StatusMessage struct {
-	Id     string
-	Status string
+type ControllerMessage struct {
+	Id     string `json:"id"`
+	Status string `json:"status"`
 }
 
-type WordData struct {
-	SortedWord string
-	Anagrams   map[string]struct{}
+type MapperData struct {
+	SortedWord string              `json:"sortedWord"`
+	Anagrams   map[string]struct{} `json:"anagrams"`
 }
 
 type SplitterData struct {

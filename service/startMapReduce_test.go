@@ -1,10 +1,11 @@
 package service
 
 import (
-	"cloud.google.com/go/pubsub"
+	ps "cloud.google.com/go/pubsub"
 	"context"
 	"encoding/json"
 	"github.com/stretchr/testify/assert"
+	"gitlab.com/cameron_w20/serverless-mapreduce/pubsub"
 	"gitlab.com/cameron_w20/serverless-mapreduce/tools"
 	"net/http"
 	"net/http/httptest"
@@ -24,7 +25,7 @@ func TestStartMapReduce(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	expectedResponse := `{"responseCode":200,"message":"MapReduce started successfully - results will be stored in: test-bucket-output"}`
-	expectedResult := tools.SplitterData{
+	expectedResult := pubsub.SplitterData{
 		BucketName: tools.INPUT_BUCKET_NAME,
 		FileName:   "test.txt",
 	}
@@ -38,8 +39,8 @@ func TestStartMapReduce(t *testing.T) {
 	// The subscription will listen forever unless given a context with a timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	var actualResult tools.SplitterData
-	err := subscriptions[0].Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
+	var actualResult pubsub.SplitterData
+	err := subscriptions[0].Receive(ctx, func(ctx context.Context, msg *ps.Message) {
 		// Ensure the message data matches the expected result
 		err := json.Unmarshal(msg.Data, &actualResult)
 		if err != nil {

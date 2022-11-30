@@ -6,7 +6,7 @@ if ! [ -x "$(command -v gcloud)" ]; then
   exit 1
 fi
 
- Create VPC connector for serverless VPC access to Redis
+# Create VPC connector for serverless VPC access to Redis
 if (gcloud compute networks vpc-access connectors create mapreduce-connector \
     --project=serverless-mapreduce \
     --network=default \

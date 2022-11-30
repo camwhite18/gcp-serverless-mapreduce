@@ -1,11 +1,12 @@
 package map_phase
 
 import (
-	"cloud.google.com/go/pubsub"
+	ps "cloud.google.com/go/pubsub"
 	"context"
 	"encoding/json"
 	"github.com/cloudevents/sdk-go/v2/event"
 	"github.com/stretchr/testify/assert"
+	"gitlab.com/cameron_w20/serverless-mapreduce/pubsub"
 	"gitlab.com/cameron_w20/serverless-mapreduce/tools"
 	"testing"
 	"time"
@@ -13,14 +14,14 @@ import (
 
 func TestSplitter(t *testing.T) {
 	// Setup test
-	teardown, subscriptions := tools.SetupTest(t, []string{tools.MAPPER_TOPIC, tools.CONTROLLER_TOPIC})
+	teardown, subscriptions := tools.SetupTest(t, []string{pubsub.MAPPER_TOPIC, pubsub.CONTROLLER_TOPIC})
 	defer teardown(t)
 	teardownTestStorage := tools.CreateTestStorage(t)
 	defer teardownTestStorage(t)
 
 	// Given
 	// Create a message
-	inputData := tools.SplitterData{
+	inputData := pubsub.SplitterData{
 		BucketName: tools.INPUT_BUCKET_NAME,
 		FileName:   "test.txt",
 	}
@@ -28,8 +29,8 @@ func TestSplitter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error marshalling splitter data: %v", err)
 	}
-	message := tools.MessagePublishedData{
-		Message: tools.PubSubMessage{
+	message := pubsub.MessagePublishedData{
+		Message: pubsub.PubSubMessage{
 			Data:       inputDataBytes,
 			Attributes: make(map[string]string),
 		},
@@ -43,7 +44,7 @@ func TestSplitter(t *testing.T) {
 	}
 
 	expectedResult := []string{"the", "quick", "brown", "fox", "jumps", "over", "lazy", "dog."}
-	expectedControllerResult := tools.StatusMessage{Status: tools.STATUS_STARTED}
+	expectedControllerResult := pubsub.ControllerMessage{Status: pubsub.STATUS_STARTED}
 
 	// When
 	err = Splitter(context.Background(), e)
@@ -56,8 +57,8 @@ func TestSplitter(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 	var actualResult []string
-	err = subscriptions[0].Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
-		// Unmarshal the message data into the WordData struct
+	err = subscriptions[0].Receive(ctx, func(ctx context.Context, msg *ps.Message) {
+		// Unmarshal the message data into the MapperData struct
 		err := json.Unmarshal(msg.Data, &actualResult)
 		if err != nil {
 			t.Fatalf("Error unmarshalling message: %v", err)
@@ -75,9 +76,9 @@ func TestSplitter(t *testing.T) {
 	// The subscription will listen forever unless given a context with a timeout
 	controllerCtx, controllerCancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer controllerCancel()
-	var received tools.StatusMessage
-	err = subscriptions[1].Receive(controllerCtx, func(ctx context.Context, msg *pubsub.Message) {
-		// Unmarshal the message data into the WordData struct
+	var received pubsub.ControllerMessage
+	err = subscriptions[1].Receive(controllerCtx, func(ctx context.Context, msg *ps.Message) {
+		// Unmarshal the message data into the MapperData struct
 		err := json.Unmarshal(msg.Data, &received)
 		if err != nil {
 			t.Fatalf("Error unmarshalling message: %v", err)

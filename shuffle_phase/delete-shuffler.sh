@@ -19,7 +19,8 @@ echo "Deleting shuffler"
 if (gcloud functions delete shuffler \
   --gen2 \
   --region=europe-west2 \
-  --project=serverless-mapreduce) ; then
+  --project=serverless-mapreduce \
+  --quiet) ; then
   echo "Successfully deleted shuffler"
 else
   echo "Failed to delete shuffler"

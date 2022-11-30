@@ -5,19 +5,20 @@ import (
 	"encoding/json"
 	"github.com/cloudevents/sdk-go/v2/event"
 	"github.com/stretchr/testify/assert"
+	"gitlab.com/cameron_w20/serverless-mapreduce/pubsub"
 	"gitlab.com/cameron_w20/serverless-mapreduce/tools"
 	"testing"
 )
 
 func TestShuffler(t *testing.T) {
 	// Setup test
-	teardown, _ := tools.SetupTest(t, []string{})
+	teardown, _ := tools.SetupTest(t, []string{pubsub.CONTROLLER_TOPIC})
 	defer teardown(t)
 	teardownRedis := tools.SetupRedisTest(t)
 	defer teardownRedis(t)
 	// Given
 	// Create a message
-	inputData := []tools.WordData{
+	inputData := []pubsub.MapperData{
 		{SortedWord: "acer", Anagrams: map[string]struct{}{"care": {}, "race": {}}},
 		{SortedWord: "aprt", Anagrams: map[string]struct{}{"trap": {}, "part": {}}},
 	}
@@ -25,8 +26,8 @@ func TestShuffler(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error marshalling Shuffler data: %v", err)
 	}
-	message := tools.MessagePublishedData{
-		Message: tools.PubSubMessage{
+	message := pubsub.MessagePublishedData{
+		Message: pubsub.PubSubMessage{
 			Data:       inputDataBytes,
 			Attributes: make(map[string]string),
 		},

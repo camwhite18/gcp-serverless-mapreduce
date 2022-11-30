@@ -5,11 +5,10 @@ import (
 	"context"
 	"fmt"
 	"github.com/cloudevents/sdk-go/v2/event"
-	"gitlab.com/cameron_w20/serverless-mapreduce/tools"
+	"gitlab.com/cameron_w20/serverless-mapreduce/pubsub"
+	r "gitlab.com/cameron_w20/serverless-mapreduce/redis"
 	"log"
-	"os"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -20,27 +19,24 @@ import (
 // message data to be of type []WordData.
 func Reducer(ctx context.Context, e event.Event) error {
 	start := time.Now()
-	_, attributes, err := tools.ReadPubSubMessage(ctx, e, nil)
+	// Create a new pubsub client
+	pubsubClient, err := pubsub.New(ctx, e)
+	if err != nil {
+		return err
+	}
+	defer pubsubClient.Close()
+
+	attributes, err := pubsubClient.ReadPubSubMessage(nil)
 	if err != nil {
 		return err
 	}
 	reducerNum := attributes["reducerNum"]
 	log.Printf("Starting reducer %s", reducerNum)
-	reducerNumInt, err := strconv.Atoi(reducerNum)
-	if err != nil {
-		return err
-	}
 	outputBucket := attributes["outputBucket"]
 	fileName := fmt.Sprintf("anagrams-part-%s.txt", reducerNum)
 
 	//Initialize the redis pool if it hasn't been initialized yet
-	if tools.ReducerRedisPool == nil {
-		var err error
-		tools.ReducerRedisPool, err = tools.InitReducerRedisPool(os.Getenv("REDIS_HOSTS"))
-		if err != nil {
-			return fmt.Errorf("error initializing redis pool: %v", err)
-		}
-	}
+	r.InitMultiRedisClient()
 	// Create a new storage client
 	client, err := storage.NewClient(ctx)
 	if err != nil {
@@ -54,12 +50,12 @@ func Reducer(ctx context.Context, e event.Event) error {
 	// Create a channel to read the keys from redis
 	keysChan := make(chan string)
 	// Read the keys from redis
-	readKeysFromRedis(ctx, keysChan, reducerNumInt)
+	readKeysFromRedis(ctx, keysChan, reducerNum)
 	// Get the values for each key from the redis instance
 	var wg sync.WaitGroup
-	readAnagramsFromRedis(ctx, &wg, keysChan, writer, reducerNumInt)
+	readAnagramsFromRedis(ctx, &wg, keysChan, writer, reducerNum)
 	wg.Wait()
-	res := tools.ReducerRedisPool[reducerNumInt].FlushAll(ctx)
+	res := r.MultiRedisClient[reducerNum].FlushAll(ctx)
 	if res.Err() != nil {
 		log.Printf("error flushing redis: %v", err)
 	}
@@ -67,10 +63,10 @@ func Reducer(ctx context.Context, e event.Event) error {
 	return nil
 }
 
-func readKeysFromRedis(ctx context.Context, keysChan chan string, reducerNum int) {
+func readKeysFromRedis(ctx context.Context, keysChan chan string, reducerNum string) {
 	go func() {
 		defer close(keysChan)
-		iter := tools.ReducerRedisPool[reducerNum].Scan(ctx, 0, "", 100).Iterator()
+		iter := r.MultiRedisClient[reducerNum].Scan(ctx, 0, "", 100).Iterator()
 		for iter.Next(ctx) {
 			keysChan <- iter.Val()
 		}
@@ -80,9 +76,9 @@ func readKeysFromRedis(ctx context.Context, keysChan chan string, reducerNum int
 	}()
 }
 
-func readAnagramsFromRedis(ctx context.Context, wg *sync.WaitGroup, keysChan chan string, writer *storage.Writer, reducerNum int) {
+func readAnagramsFromRedis(ctx context.Context, wg *sync.WaitGroup, keysChan chan string, writer *storage.Writer, reducerNum string) {
 	for key := range keysChan {
-		res := tools.ReducerRedisPool[reducerNum].LRange(ctx, key, 0, -1)
+		res := r.MultiRedisClient[reducerNum].LRange(ctx, key, 0, -1)
 		if res.Err() != nil {
 			log.Printf("error getting value from redis: %v", res.Err())
 		}

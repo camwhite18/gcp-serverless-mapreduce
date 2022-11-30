@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"github.com/cloudevents/sdk-go/v2/event"
 	"github.com/stretchr/testify/assert"
+	"gitlab.com/cameron_w20/serverless-mapreduce/pubsub"
 	"gitlab.com/cameron_w20/serverless-mapreduce/tools"
 	"io"
 	"testing"
@@ -25,8 +26,8 @@ func TestReducer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error marshalling mapper data: %v", err)
 	}
-	message := tools.MessagePublishedData{
-		Message: tools.PubSubMessage{
+	message := pubsub.MessagePublishedData{
+		Message: pubsub.PubSubMessage{
 			Data:       inputDataBytes,
 			Attributes: map[string]string{"outputBucket": tools.OUTPUT_BUCKET_NAME, "reducerNum": "1"},
 		},

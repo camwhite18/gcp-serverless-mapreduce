@@ -1,11 +1,12 @@
 package map_phase
 
 import (
-	"cloud.google.com/go/pubsub"
+	ps "cloud.google.com/go/pubsub"
 	"context"
 	"encoding/json"
 	"github.com/cloudevents/sdk-go/v2/event"
 	"github.com/stretchr/testify/assert"
+	"gitlab.com/cameron_w20/serverless-mapreduce/pubsub"
 	"gitlab.com/cameron_w20/serverless-mapreduce/tools"
 	"testing"
 	"time"
@@ -13,7 +14,7 @@ import (
 
 func TestMapper(t *testing.T) {
 	// Setup test
-	teardown, subscriptions := tools.SetupTest(t, []string{tools.COMBINE_TOPIC})
+	teardown, subscriptions := tools.SetupTest(t, []string{pubsub.COMBINE_TOPIC})
 	defer teardown(t)
 	// Given
 	// Create a message
@@ -22,8 +23,8 @@ func TestMapper(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error marshalling Mapper data: %v", err)
 	}
-	message := tools.MessagePublishedData{
-		Message: tools.PubSubMessage{
+	message := pubsub.MessagePublishedData{
+		Message: pubsub.PubSubMessage{
 			Data:       inputDataBytes,
 			Attributes: make(map[string]string),
 		},
@@ -36,7 +37,7 @@ func TestMapper(t *testing.T) {
 		t.Fatalf("Error setting event data: %v", err)
 	}
 
-	expectedResult := []tools.WordData{
+	expectedResult := []pubsub.MapperData{
 		{Anagrams: map[string]struct{}{"quick": {}}, SortedWord: "cikqu"},
 		{Anagrams: map[string]struct{}{"brown": {}}, SortedWord: "bnorw"},
 		{Anagrams: map[string]struct{}{"fox": {}}, SortedWord: "fox"},
@@ -51,9 +52,9 @@ func TestMapper(t *testing.T) {
 	// The subscription will listen forever unless given a context with a timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	var actualResult []tools.WordData
-	err = subscriptions[0].Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
-		// Unmarshal the message data into the WordData struct
+	var actualResult []pubsub.MapperData
+	err = subscriptions[0].Receive(ctx, func(ctx context.Context, msg *ps.Message) {
+		// Unmarshal the message data into the MapperData struct
 		err := json.Unmarshal(msg.Data, &actualResult)
 		if err != nil {
 			t.Fatalf("Error unmarshalling message: %v", err)

@@ -1,14 +1,13 @@
 package map_phase
 
 import (
-	"cloud.google.com/go/pubsub"
 	"cloud.google.com/go/storage"
 	"context"
 	"encoding/binary"
 	"fmt"
 	"github.com/cloudevents/sdk-go/v2/event"
 	"github.com/google/uuid"
-	"gitlab.com/cameron_w20/serverless-mapreduce/tools"
+	"gitlab.com/cameron_w20/serverless-mapreduce/pubsub"
 	"io"
 	"log"
 	"math"
@@ -23,20 +22,27 @@ import (
 // type SplitterData.
 func Splitter(ctx context.Context, e event.Event) error {
 	start := time.Now()
-	// Read the data from the event i.e. message pushed from startMapReduce
-	splitterData := tools.SplitterData{}
-	client, attributes, err := tools.ReadPubSubMessage(ctx, e, &splitterData)
+	// Create a new pubsub client
+	pubsubClient, err := pubsub.New(ctx, e)
 	if err != nil {
 		return err
 	}
-	defer client.Close()
+	defer pubsubClient.Close()
+
+	// Read the data from the event i.e. message pushed from startMapReduce
+	splitterData := pubsub.SplitterData{}
+	attributes, err := pubsubClient.ReadPubSubMessage(&splitterData)
+	if err != nil {
+		return err
+	}
+
 	// Split the text in the file into partitions for efficiency and to avoid pubsub message size limits
 	partitionedText, err := splitFile(ctx, splitterData.BucketName, splitterData.FileName)
 	if err != nil {
 		return fmt.Errorf("error splitting file: %v", err)
 	}
 	// Send the partitions to the Mapper
-	err = sendTextToMapper(ctx, client, attributes, partitionedText)
+	err = sendTextToMapper(pubsubClient, attributes, partitionedText)
 	if err != nil {
 		return fmt.Errorf("error sending text to Mapper: %v", err)
 	}
@@ -59,7 +65,7 @@ func splitFile(ctx context.Context, bucketName, fileName string) ([][]string, er
 	// Remove non-unique words:
 	uniqueSplitText := removeDuplicateWords(splitText)
 	// Partition the file since this will speed up the map phase
-	partitionedText := partitionFile(uniqueSplitText, tools.MAX_MESSAGE_SIZE_BYTES)
+	partitionedText := partitionFile(uniqueSplitText, pubsub.MAX_MESSAGE_SIZE_BYTES)
 	return partitionedText, nil
 }
 
@@ -151,14 +157,14 @@ func partitionFile(splitText []string, messageSize int) [][]string {
 }
 
 // sendTextToMapper sends the given text to the Mapper and returns an error
-func sendTextToMapper(ctx context.Context, client *pubsub.Client, attributes map[string]string,
+func sendTextToMapper(pubsubClient pubsub.Client, attributes map[string]string,
 	partitionedText [][]string) error {
 	// Create a client for the Mapper topic
-	mapperTopic := client.Topic(tools.MAPPER_TOPIC)
-	defer mapperTopic.Stop()
+	//mapperTopic := client.Topic(tools.MAPPER_TOPIC)
+	//defer mapperTopic.Stop()
 	// Create a client for the controller topic
-	controllerTopic := client.Topic(tools.CONTROLLER_TOPIC)
-	defer controllerTopic.Stop()
+	//controllerTopic := client.Topic(tools.CONTROLLER_TOPIC)
+	//defer controllerTopic.Stop()
 	// We need to use a wait group to wait for all the messages to be published before returning
 	var wg sync.WaitGroup
 	for _, partition := range partitionedText {
@@ -169,16 +175,19 @@ func sendTextToMapper(ctx context.Context, client *pubsub.Client, attributes map
 		}
 		// Create a unique id for the partition so that we can track it
 		partitionAttributes["partitionId"] = uuid.New().String()
-		statusMessage := tools.StatusMessage{
+		statusMessage := pubsub.ControllerMessage{
 			Id:     partitionAttributes["partitionId"],
-			Status: tools.STATUS_STARTED,
+			Status: pubsub.STATUS_STARTED,
 		}
 		// Send the message concurrently to speed up the process
-		wg.Add(2)
-		// Publish the partition to the Mapper topic
-		go tools.SendPubSubMessage(ctx, &wg, mapperTopic, partition, partitionAttributes)
-		// Send a message to the controller topic to let it know that a partition has been published
-		go tools.SendPubSubMessage(ctx, &wg, controllerTopic, statusMessage, nil)
+		wg.Add(1)
+		go func(partition []string) {
+			defer wg.Done()
+			// Publish the partition to the Mapper topic
+			pubsubClient.SendPubSubMessage(pubsub.MAPPER_TOPIC, partition, partitionAttributes)
+			// Send a message to the controller topic to let it know that a partition has been published
+			pubsubClient.SendPubSubMessage(pubsub.CONTROLLER_TOPIC, statusMessage, nil)
+		}(partition)
 	}
 	wg.Wait()
 	return nil

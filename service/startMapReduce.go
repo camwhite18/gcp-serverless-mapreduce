@@ -1,13 +1,12 @@
 package service
 
 import (
-	"cloud.google.com/go/pubsub"
 	"cloud.google.com/go/storage"
 	"context"
 	"encoding/json"
-	"gitlab.com/cameron_w20/serverless-mapreduce/tools"
+	"github.com/cloudevents/sdk-go/v2/event"
+	"gitlab.com/cameron_w20/serverless-mapreduce/pubsub"
 	"google.golang.org/api/iterator"
-	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -25,6 +24,14 @@ type Response struct {
 // output-bucket: the name of the bucket where the output files will be stored
 func StartMapReduce(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	// Create a new pubsub client with a blank event
+	pubsubClient, err := pubsub.New(ctx, event.New())
+	if err != nil {
+		writeResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	defer pubsubClient.Close()
+
 	// Get the query parameters
 	inputBucketName := r.URL.Query().Get("input-bucket")
 	if inputBucketName == "" {
@@ -47,26 +54,20 @@ func StartMapReduce(w http.ResponseWriter, r *http.Request) {
 		writeResponse(w, http.StatusBadRequest, "No files found in bucket")
 		return
 	}
-	// Create a new pubsub client
-	client, err := pubsub.NewClient(ctx, "serverless-mapreduce")
-	if err != nil {
-		log.Printf("Error creating client: %v", err)
-		return
-	}
-	defer client.Close()
-	// Create a client for the splitter topic
-	topic := client.Topic(tools.SPLITTER_TOPIC)
 	// Push each file name to the splitter topic
 	// Use a wait group so we can wait for all the messages to be sent before returning
 	var wg sync.WaitGroup
 	for _, file := range files {
-		splitterData := tools.SplitterData{
+		splitterData := pubsub.SplitterData{
 			BucketName: inputBucketName,
 			FileName:   file,
 		}
 		wg.Add(1)
 		// Use a goroutine to send the messages concurrently -> this is faster than sending them sequentially
-		go tools.SendPubSubMessage(ctx, &wg, topic, splitterData, map[string]string{"outputBucket": outputBucketName})
+		go func() {
+			defer wg.Done()
+			pubsubClient.SendPubSubMessage(pubsub.SPLITTER_TOPIC, splitterData, map[string]string{"outputBucket": outputBucketName})
+		}()
 	}
 	wg.Wait()
 	writeResponse(w, http.StatusOK, "MapReduce started successfully - results will be stored in: "+outputBucketName)

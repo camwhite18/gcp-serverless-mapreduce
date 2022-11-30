@@ -1,11 +1,12 @@
 package shuffle_phase
 
 import (
-	"cloud.google.com/go/pubsub"
+	ps "cloud.google.com/go/pubsub"
 	"context"
 	"encoding/json"
 	"github.com/cloudevents/sdk-go/v2/event"
 	"github.com/stretchr/testify/assert"
+	"gitlab.com/cameron_w20/serverless-mapreduce/pubsub"
 	"gitlab.com/cameron_w20/serverless-mapreduce/tools"
 	"testing"
 	"time"
@@ -13,11 +14,11 @@ import (
 
 func TestCombine(t *testing.T) {
 	// Setup test
-	teardown, subscriptions := tools.SetupTest(t, []string{tools.SHUFFLER_TOPIC})
+	teardown, subscriptions := tools.SetupTest(t, []string{pubsub.SHUFFLER_TOPIC})
 	defer teardown(t)
 	// Given
 	// Create a message
-	inputData := []tools.WordData{
+	inputData := []pubsub.MapperData{
 		{Anagrams: map[string]struct{}{"care": {}}, SortedWord: "acer"},
 		{Anagrams: map[string]struct{}{"part": {}}, SortedWord: "artp"},
 		{Anagrams: map[string]struct{}{"race": {}}, SortedWord: "acer"},
@@ -28,8 +29,8 @@ func TestCombine(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error marshalling mapper data: %v", err)
 	}
-	message := tools.MessagePublishedData{
-		Message: tools.PubSubMessage{
+	message := pubsub.MessagePublishedData{
+		Message: pubsub.PubSubMessage{
 			Data:       inputDataBytes,
 			Attributes: make(map[string]string),
 		},
@@ -42,7 +43,7 @@ func TestCombine(t *testing.T) {
 		t.Fatalf("Error setting event data: %v", err)
 	}
 
-	expectedResult := []tools.WordData{
+	expectedResult := []pubsub.MapperData{
 		{SortedWord: "acer", Anagrams: map[string]struct{}{"care": {}, "race": {}}},
 		{SortedWord: "artp", Anagrams: map[string]struct{}{"part": {}, "trap": {}}},
 	}
@@ -56,9 +57,9 @@ func TestCombine(t *testing.T) {
 	// The subscription will listen forever unless given a context with a timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	var actualResult []tools.WordData
-	err = subscriptions[0].Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
-		// Unmarshal the message data into the WordData struct
+	var actualResult []pubsub.MapperData
+	err = subscriptions[0].Receive(ctx, func(ctx context.Context, msg *ps.Message) {
+		// Unmarshal the message data into the MapperData struct
 		err := json.Unmarshal(msg.Data, &actualResult)
 		if err != nil {
 			t.Fatalf("Error unmarshalling message: %v", err)

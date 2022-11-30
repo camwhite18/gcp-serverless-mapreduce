@@ -3,7 +3,7 @@ package shuffle_phase
 import (
 	"context"
 	"github.com/cloudevents/sdk-go/v2/event"
-	"gitlab.com/cameron_w20/serverless-mapreduce/tools"
+	"gitlab.com/cameron_w20/serverless-mapreduce/pubsub"
 	"log"
 	"time"
 )
@@ -13,13 +13,19 @@ import (
 // data to be of type []WordData.
 func Combine(ctx context.Context, e event.Event) error {
 	start := time.Now()
-	// Read the data from the event i.e. message pushed from mapper
-	var wordData []tools.WordData
-	client, attributes, err := tools.ReadPubSubMessage(ctx, e, &wordData)
+	// Create a new pubsub client
+	pubsubClient, err := pubsub.New(ctx, e)
 	if err != nil {
 		return err
 	}
-	defer client.Close()
+	defer pubsubClient.Close()
+
+	// Read the data from the event i.e. message pushed from mapper
+	var wordData []pubsub.MapperData
+	attributes, err := pubsubClient.ReadPubSubMessage(&wordData)
+	if err != nil {
+		return err
+	}
 	// Use map[string]struct{} as the value to act as a set to not consider duplicate words
 	combinedWordDataMap := make(map[string]map[string]struct{})
 	// Combine the key-value pairs
@@ -33,12 +39,12 @@ func Combine(ctx context.Context, e event.Event) error {
 		}
 	}
 	// Convert the map to a slice of WordData
-	combinedKeyValues := make([]tools.WordData, 0)
+	combinedKeyValues := make([]pubsub.MapperData, 0)
 	for k, v := range combinedWordDataMap {
-		combinedKeyValues = append(combinedKeyValues, tools.WordData{SortedWord: k, Anagrams: v})
+		combinedKeyValues = append(combinedKeyValues, pubsub.MapperData{SortedWord: k, Anagrams: v})
 	}
 	// Send the combined key-value pairs to the Shuffler topic
-	tools.SendPubSubMessage(ctx, nil, client.Topic(tools.SHUFFLER_TOPIC), combinedKeyValues, attributes)
+	pubsubClient.SendPubSubMessage(pubsub.SHUFFLER_TOPIC, combinedKeyValues, attributes)
 	log.Printf("Combining took %v", time.Since(start))
 	return nil
 }
