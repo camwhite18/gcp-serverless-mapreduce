@@ -30,7 +30,7 @@ type ControllerMessage struct {
 	Status string `json:"status"`
 }
 
-type MapperData struct {
+type MappedWord struct {
 	SortedWord string              `json:"sortedWord"`
 	Anagrams   map[string]struct{} `json:"anagrams"`
 }

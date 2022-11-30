@@ -58,7 +58,7 @@ func TestSplitter(t *testing.T) {
 	defer cancel()
 	var actualResult []string
 	err = subscriptions[0].Receive(ctx, func(ctx context.Context, msg *ps.Message) {
-		// Unmarshal the message data into the MapperData struct
+		// Unmarshal the message data into the MappedWord struct
 		err := json.Unmarshal(msg.Data, &actualResult)
 		if err != nil {
 			t.Fatalf("Error unmarshalling message: %v", err)
@@ -78,7 +78,7 @@ func TestSplitter(t *testing.T) {
 	defer controllerCancel()
 	var received pubsub.ControllerMessage
 	err = subscriptions[1].Receive(controllerCtx, func(ctx context.Context, msg *ps.Message) {
-		// Unmarshal the message data into the MapperData struct
+		// Unmarshal the message data into the MappedWord struct
 		err := json.Unmarshal(msg.Data, &received)
 		if err != nil {
 			t.Fatalf("Error unmarshalling message: %v", err)

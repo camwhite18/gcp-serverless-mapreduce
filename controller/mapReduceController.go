@@ -12,7 +12,7 @@ import (
 
 // Controller is a function that is triggered by a message being published to the controller topic. It is triggered by the
 // splitter for each file partition and adds the partitions uuid to each "started-reducer-{0,..,N-1}" set in redis. It is also
-// triggered by the reducer for each slice of MapperData it receives. It removes the uuid for that partition from that
+// triggered by the reducer for each slice of MappedWord it receives. It removes the uuid for that partition from that
 // reducer's set and checks if the set is empty. If it is empty, then it sends a message to the outputter to start.
 func Controller(ctx context.Context, e event.Event) error {
 	// Create a new pubsub client

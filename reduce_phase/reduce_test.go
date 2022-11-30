@@ -7,6 +7,7 @@ import (
 	"github.com/cloudevents/sdk-go/v2/event"
 	"github.com/stretchr/testify/assert"
 	"gitlab.com/cameron_w20/serverless-mapreduce/pubsub"
+	"gitlab.com/cameron_w20/serverless-mapreduce/redis"
 	"gitlab.com/cameron_w20/serverless-mapreduce/tools"
 	"io"
 	"testing"
@@ -39,6 +40,10 @@ func TestReducer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error setting event data: %v", err)
 	}
+
+	redis.InitRedisClient()
+	redis.RedisClient.LPush(context.Background(), "acer", "race", "race", "care", "race")
+	redis.RedisClient.LPush(context.Background(), "aprt", "part", "trap", "trap", "part")
 
 	expectedResult1 := "acer: care race\n"
 	expectedResult2 := "aprt: part trap\n"

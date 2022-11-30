@@ -8,14 +8,12 @@ import (
 	"io"
 	"log"
 	"strings"
-	"time"
 )
 
 type Client interface {
 	Close()
 	ReadObjectNames(ctx context.Context, bucketName string) ([]string, error)
 	ReadObject(ctx context.Context, bucketName, objectName string) ([]byte, error)
-	CreateWriter(ctx context.Context, bucketName, objectName string)
 	WriteData(key string, value []string)
 }
 
@@ -36,17 +34,29 @@ func New(ctx context.Context) (Client, error) {
 	}, nil
 }
 
+func NewWithWriter(ctx context.Context, bucketName, objectName string) (Client, error) {
+	client, err := storage.NewClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &clientImpl{
+		client: client,
+		writer: client.Bucket(bucketName).Object(objectName).NewWriter(ctx),
+	}, nil
+}
+
 func (c *clientImpl) Close() {
 	err := c.client.Close()
 	if err != nil {
 		log.Println("Error closing storage client: ", err)
 	}
+	err = c.writer.Close()
+	if err != nil {
+		log.Println("Error closing storage writer: ", err)
+	}
 }
 
 func (c *clientImpl) ReadObjectNames(ctx context.Context, bucketName string) ([]string, error) {
-	// Create a 10-second timeout context so we don't wait forever if there is an error
-	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
-	defer cancel()
 	// Iterate over all objects in the bucket and add each file name to the files slice
 	objects := c.client.Bucket(bucketName).Objects(ctx, nil)
 	files := make([]string, 0)
@@ -65,9 +75,6 @@ func (c *clientImpl) ReadObjectNames(ctx context.Context, bucketName string) ([]
 }
 
 func (c *clientImpl) ReadObject(ctx context.Context, bucketName, objectName string) ([]byte, error) {
-	// Create a 10-second timeout context so we don't wait forever if there is an error
-	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
-	defer cancel()
 	// Create a reader for the file
 	rc, err := c.client.Bucket(bucketName).Object(objectName).NewReader(ctx)
 	if err != nil {
@@ -80,14 +87,6 @@ func (c *clientImpl) ReadObject(ctx context.Context, bucketName, objectName stri
 		return nil, err
 	}
 	return data, nil
-}
-
-func (c *clientImpl) CreateWriter(ctx context.Context, bucketName, objectName string) {
-	// Create a 10-second timeout context so we don't wait forever if there is an error
-	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
-	defer cancel()
-	// Create a writer for the file
-	c.writer = c.client.Bucket(bucketName).Object(objectName).NewWriter(ctx)
 }
 
 func (c *clientImpl) WriteData(key string, value []string) {

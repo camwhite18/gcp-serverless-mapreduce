@@ -18,7 +18,7 @@ func TestShuffler(t *testing.T) {
 	defer teardownRedis(t)
 	// Given
 	// Create a message
-	inputData := []pubsub.MapperData{
+	inputData := []pubsub.MappedWord{
 		{SortedWord: "acer", Anagrams: map[string]struct{}{"care": {}, "race": {}}},
 		{SortedWord: "aprt", Anagrams: map[string]struct{}{"trap": {}, "part": {}}},
 	}

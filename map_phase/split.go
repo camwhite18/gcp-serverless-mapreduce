@@ -155,7 +155,7 @@ func sendTextToMapper(pubsubClient pubsub.Client, attributes map[string]string,
 		go func(partition []string) {
 			defer wg.Done()
 			// Send a message to the controller topic to let it know that a partition has been published
-			sendIdToController(pubsubClient, partitionAttributes)
+			sendIDToController(pubsubClient, partitionAttributes)
 			// Publish the partition to the Mapper topic
 			pubsubClient.SendPubSubMessage(pubsub.MAPPER_TOPIC, partition, partitionAttributes)
 		}(partition)
@@ -164,7 +164,7 @@ func sendTextToMapper(pubsubClient pubsub.Client, attributes map[string]string,
 	return nil
 }
 
-func sendIdToController(pubsubClient pubsub.Client, attributes map[string]string) {
+func sendIDToController(pubsubClient pubsub.Client, attributes map[string]string) {
 	// Create a unique id for the partition so that we can track it
 	attributes["partitionId"] = uuid.New().String()
 	statusMessage := pubsub.ControllerMessage{

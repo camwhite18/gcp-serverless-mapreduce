@@ -4,6 +4,7 @@ import (
 	"cloud.google.com/go/pubsub"
 	"cloud.google.com/go/storage"
 	"context"
+	"gitlab.com/cameron_w20/serverless-mapreduce/redis"
 	"google.golang.org/api/iterator"
 	"os"
 	"strings"
@@ -147,21 +148,29 @@ func CreateTestStorage(tb testing.TB) func(tb testing.TB) {
 
 func SetupRedisTest(tb testing.TB) func(tb testing.TB) {
 	// Setup test
+	existingRedisHostVal := os.Getenv("REDIS_HOST")
+	err := os.Setenv("REDIS_HOST", "localhost")
+	if err != nil {
+		tb.Fatalf("Error setting environment variable: %v", err)
+	}
 	existingRedisHostsVal := os.Getenv("REDIS_HOSTS")
-	err := os.Setenv("REDIS_HOSTS", "localhost localhost localhost localhost localhost")
+	err = os.Setenv("REDIS_HOSTS", "localhost localhost localhost localhost localhost")
 	if err != nil {
 		tb.Fatalf("Error setting environment variable: %v", err)
 	}
 
 	return func(tb testing.TB) {
 		// Teardown test
-		//conn := RedisPool.Get()
-		//defer conn.Close()
-		//_, err := conn.Do("FLUSHALL")
-		//if err != nil {
-		//	tb.Fatalf("Error getting data from redis: %v", err)
-		//}
+		redis.InitRedisClient()
+		redis.RedisClient.FlushAll(context.Background())
 		// Reset the REDIS_HOST environment variable
 		err = os.Setenv("REDIS_HOSTS", existingRedisHostsVal)
+		if err != nil {
+			tb.Fatalf("Error setting environment variable: %v", err)
+		}
+		err = os.Setenv("REDIS_HOST", existingRedisHostVal)
+		if err != nil {
+			tb.Fatalf("Error setting environment variable: %v", err)
+		}
 	}
 }

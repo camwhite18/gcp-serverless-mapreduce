@@ -13,10 +13,11 @@ import (
 )
 
 // Shuffler is a function that is triggered by a message being published to the Shuffler topic. It receives a list of
-// MapperData objects and shuffles them into a map of reducer number to a list of MapperData objects. It then pushes each
-// list of MapperData objects to the appropriate reducer topic.
+// MappedWord objects and shuffles them into a map of reducer number to a list of MappedWord objects. It then pushes each
+// list of MappedWord objects to the appropriate reducer topic.
 func Shuffler(ctx context.Context, e event.Event) error {
 	start := time.Now()
+	r.InitMultiRedisClient()
 	// Create a new pubsub client
 	pubsubClient, err := pubsub.New(ctx, e)
 	if err != nil {
@@ -25,23 +26,21 @@ func Shuffler(ctx context.Context, e event.Event) error {
 	defer pubsubClient.Close()
 
 	// Read the data from the event i.e. message pushed from Combiner
-	var wordData []pubsub.MapperData
+	var wordData []pubsub.MappedWord
 	attributes, err := pubsubClient.ReadPubSubMessage(&wordData)
 	if err != nil {
 		return err
 	}
 
-	// Shuffle the words into a map of reducer number to a list of MapperData objects then add each list to the appropriate
-	// redis instance as this is much faster than adding each MapperData object to redis individually
+	// Shuffle the words into a map of reducer number to a list of MappedWord objects then add each list to the appropriate
+	// redis instance as this is much faster than adding each MappedWord object to redis individually
 	shuffledText := shuffle(wordData)
-	// Add each list of MapperData objects to the appropriate reducer number
+	// Add each list of MappedWord objects to the appropriate reducer number
 	err = addToRedis(ctx, shuffledText)
 	if err != nil {
 		return err
 	}
 	// Send a message to the controller topic to let it know that the shuffling is complete for the partition
-	//topic := client.Topic(pubsub.CONTROLLER_TOPIC)
-	//defer topic.Stop()
 	statusMessage := pubsub.ControllerMessage{
 		Id:     attributes["partitionId"],
 		Status: pubsub.STATUS_FINISHED,
@@ -51,24 +50,24 @@ func Shuffler(ctx context.Context, e event.Event) error {
 	return nil
 }
 
-// shuffle takes a list of MapperData objects and shuffles them into a map of reducer number to a list of MapperData objects
-func shuffle(wordData []pubsub.MapperData) map[int][]pubsub.MapperData {
-	shuffledText := make(map[int][]pubsub.MapperData)
+// shuffle takes a list of MappedWord objects and shuffles them into a map of reducer number to a list of MappedWord objects
+func shuffle(wordData []pubsub.MappedWord) map[int][]pubsub.MappedWord {
+	shuffledText := make(map[int][]pubsub.MappedWord)
 	var mu sync.Mutex
 	var wg sync.WaitGroup
-	// Loop through each MapperData object and add it to the appropriate reducer number concurrently
+	// Loop through each MappedWord object and add it to the appropriate reducer number concurrently
 	for _, value := range wordData {
 		wg.Add(1)
-		go func(value pubsub.MapperData) {
+		go func(value pubsub.MappedWord) {
 			defer wg.Done()
 			// Get the reducer number for a given sorted word
 			reducerNum := partition(value.SortedWord)
 			// Lock the map to prevent concurrent writes
 			mu.Lock()
 			defer mu.Unlock()
-			// Add the MapperData object to the appropriate reducer number
+			// Add the MappedWord object to the appropriate reducer number
 			if shuffledText[reducerNum] == nil {
-				shuffledText[reducerNum] = make([]pubsub.MapperData, 0)
+				shuffledText[reducerNum] = make([]pubsub.MappedWord, 0)
 			}
 			shuffledText[reducerNum] = append(shuffledText[reducerNum], value)
 		}(value)
@@ -89,16 +88,15 @@ func partition(s string) int {
 	return int(hashedString % uint32(r.NO_OF_REDUCER_INSTANCES))
 }
 
-func addToRedis(ctx context.Context, shuffledText map[int][]pubsub.MapperData) error {
-	r.InitMultiRedisClient()
-	// Add each list of MapperData objects to the appropriate reducer number
+func addToRedis(ctx context.Context, shuffledText map[int][]pubsub.MappedWord) error {
+	// Add each list of MappedWord objects to the appropriate reducer number
 	var wg sync.WaitGroup
 	for reducerNum := range shuffledText {
 		wg.Add(1)
 		go func(reducerNum int) {
 			defer wg.Done()
 			for _, value := range shuffledText[reducerNum] {
-				// Add the MapperData object to the appropriate reducer number
+				// Add the MappedWord object to the appropriate reducer number
 				var anagrams []interface{}
 				for word := range value.Anagrams {
 					anagrams = append(anagrams, word)

@@ -13,11 +13,12 @@ import (
 	"time"
 )
 
-// Reducer is a function that is triggered by a message being published to the Reducer topic. It receives the list of
-// key-value pairs from the shuffler, and inserts each key value pair into the Reducer's Redis instance. It requires the
-// message data to be of type []WordData.
+// Reducer is a function that is triggered by a message being published to the Reducer topic. It accesses a Redis
+// instance and reads the key-value pairs that were written by the shuffler. It then removes any duplicate anagrams,
+// sorts them alphabetically and writes the key-value pairs to a file in the output bucket.
 func Reducer(ctx context.Context, e event.Event) error {
 	start := time.Now()
+	r.InitMultiRedisClient()
 	// Create a new pubsub client
 	pubsubClient, err := pubsub.New(ctx, e)
 	if err != nil {
@@ -25,6 +26,7 @@ func Reducer(ctx context.Context, e event.Event) error {
 	}
 	defer pubsubClient.Close()
 
+	// Read the data from the event i.e. message pushed from controller
 	attributes, err := pubsubClient.ReadPubSubMessage(nil)
 	if err != nil {
 		return err
@@ -34,23 +36,12 @@ func Reducer(ctx context.Context, e event.Event) error {
 	outputBucket := attributes["outputBucket"]
 	fileName := fmt.Sprintf("anagrams-part-%s.txt", reducerNum)
 
-	//Initialize the redis pool if it hasn't been initialized yet
-	r.InitMultiRedisClient()
-	// Create a new storage client
-	storageClient, err := storage.New(ctx)
+	// Read and process the key-value pairs from redis
+	err = reduceAnagramsFromRedis(ctx, outputBucket, fileName, reducerNum)
 	if err != nil {
 		return err
 	}
-	defer storageClient.Close()
-	storageClient.CreateWriter(ctx, outputBucket, fileName)
-	// Create a channel to read the keys from redis
-	keysChan := make(chan string)
-	// Read the keys from redis
-	readKeysFromRedis(ctx, keysChan, reducerNum)
-	// Get the values for each key from the redis instance
-	var wg sync.WaitGroup
-	readAnagramsFromRedis(ctx, &wg, keysChan, storageClient, reducerNum)
-	wg.Wait()
+	// Remove all the data from the redis instance after it has been processed
 	res := r.MultiRedisClient[reducerNum].FlushAll(ctx)
 	if res.Err() != nil {
 		log.Printf("error flushing redis: %v", err)
@@ -59,43 +50,50 @@ func Reducer(ctx context.Context, e event.Event) error {
 	return nil
 }
 
-func readKeysFromRedis(ctx context.Context, keysChan chan string, reducerNum string) {
-	go func() {
-		defer close(keysChan)
-		iter := r.MultiRedisClient[reducerNum].Scan(ctx, 0, "", 100).Iterator()
-		for iter.Next(ctx) {
-			keysChan <- iter.Val()
-		}
-		if err := iter.Err(); err != nil {
-			log.Printf("error scanning redis: %v", err)
-		}
-	}()
-}
-
-func readAnagramsFromRedis(ctx context.Context, wg *sync.WaitGroup, keysChan chan string, storageClient storage.Client, reducerNum string) {
-	for key := range keysChan {
-		res := r.MultiRedisClient[reducerNum].LRange(ctx, key, 0, -1)
-		if res.Err() != nil {
-			log.Printf("error getting value from redis: %v", res.Err())
-		}
+func reduceAnagramsFromRedis(ctx context.Context, outputBucket, fileName, reducerNum string) error {
+	// Create a new storage client to write the output file
+	storageClient, err := storage.NewWithWriter(ctx, outputBucket, fileName)
+	if err != nil {
+		return err
+	}
+	defer storageClient.Close()
+	// Get all the keys from the redis instance
+	keys := r.MultiRedisClient[reducerNum].Keys(ctx, "*").Val()
+	var wg sync.WaitGroup
+	// Loop through each key and get the values
+	for _, key := range keys {
 		wg.Add(1)
 		go func(key string) {
 			defer wg.Done()
+			// Use LRange to get all the values in the list for the key
+			res := r.MultiRedisClient[reducerNum].LRange(ctx, key, 0, -1)
+			if res.Err() != nil {
+				log.Printf("error getting value from redis: %v", res.Err())
+			}
+			// Remove any duplicate anagrams in the slice
 			reducedAnagrams := reduceAnagrams(res.Val())
+			// Only write to the file if the key has more than one anagram
 			if len(reducedAnagrams) > 1 {
+				// Sort the anagrams alphabetically
 				sort.Strings(reducedAnagrams)
+				// Write the key-value pairs to the output file
 				storageClient.WriteData(key, reducedAnagrams)
 			}
 		}(key)
 	}
+	wg.Wait()
+	return nil
 }
 
 func reduceAnagrams(values []string) []string {
 	var reducedAnagrams []string
+	// Create a map to ignore duplicate anagrams
 	var anagramMap = make(map[string]struct{})
+	// Loop through each anagram and add it to the map
 	for _, value := range values {
 		anagramMap[value] = struct{}{}
 	}
+	// Convert the map back to a slice
 	for key := range anagramMap {
 		reducedAnagrams = append(reducedAnagrams, key)
 	}

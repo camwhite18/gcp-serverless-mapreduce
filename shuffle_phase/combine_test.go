@@ -18,7 +18,7 @@ func TestCombine(t *testing.T) {
 	defer teardown(t)
 	// Given
 	// Create a message
-	inputData := []pubsub.MapperData{
+	inputData := []pubsub.MappedWord{
 		{Anagrams: map[string]struct{}{"care": {}}, SortedWord: "acer"},
 		{Anagrams: map[string]struct{}{"part": {}}, SortedWord: "artp"},
 		{Anagrams: map[string]struct{}{"race": {}}, SortedWord: "acer"},
@@ -43,7 +43,7 @@ func TestCombine(t *testing.T) {
 		t.Fatalf("Error setting event data: %v", err)
 	}
 
-	expectedResult := []pubsub.MapperData{
+	expectedResult := []pubsub.MappedWord{
 		{SortedWord: "acer", Anagrams: map[string]struct{}{"care": {}, "race": {}}},
 		{SortedWord: "artp", Anagrams: map[string]struct{}{"part": {}, "trap": {}}},
 	}
@@ -57,9 +57,9 @@ func TestCombine(t *testing.T) {
 	// The subscription will listen forever unless given a context with a timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	var actualResult []pubsub.MapperData
+	var actualResult []pubsub.MappedWord
 	err = subscriptions[0].Receive(ctx, func(ctx context.Context, msg *ps.Message) {
-		// Unmarshal the message data into the MapperData struct
+		// Unmarshal the message data into the MappedWord struct
 		err := json.Unmarshal(msg.Data, &actualResult)
 		if err != nil {
 			t.Fatalf("Error unmarshalling message: %v", err)

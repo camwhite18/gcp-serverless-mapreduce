@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+source .env
+
 # Check if gcloud is installed
 if ! [ -x "$(command -v gcloud)" ]; then
   echo 'Error: gcloud is not installed.' >&2

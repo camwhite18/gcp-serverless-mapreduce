@@ -31,10 +31,10 @@ func Mapper(ctx context.Context, e event.Event) error {
 	}
 
 	// Map the words to their sorted form concurrently and store the results in mappedText
-	var mappedText []pubsub.MapperData
+	var mappedText []pubsub.MappedWord
 	var wg sync.WaitGroup
 	// Create a buffered channel to store the key-value pairs
-	keyValueChan := make(chan pubsub.MapperData, 1000)
+	keyValueChan := make(chan pubsub.MappedWord, 1000)
 	go func() {
 		defer close(keyValueChan)
 		// Iterate over the words in the text and map them to their sorted form
@@ -51,8 +51,6 @@ func Mapper(ctx context.Context, e event.Event) error {
 		mappedText = append(mappedText, wordData)
 	}
 	// Create a client for the combine topic
-	//topic := client.Topic(tools.COMBINE_TOPIC)
-	//defer topic.Stop()
 	// Send one pubsub message to the combiner per book to reduce the number of invocations -> reduce cost
 	pubsubClient.SendPubSubMessage(pubsub.COMBINE_TOPIC, mappedText, attributes)
 	log.Printf("Mapper took %v to run", time.Since(start))
@@ -60,8 +58,8 @@ func Mapper(ctx context.Context, e event.Event) error {
 }
 
 // mapWord maps a word to its sorted form and stores the result in mappedText. It accepts a pointer to a WaitGroup, a
-// pointer to a sync.Mutex, a pointer to a slice of MapperData and a string. It returns nothing.
-func mapWord(wg *sync.WaitGroup, keyValueChan chan pubsub.MapperData, word string) {
+// pointer to a sync.Mutex, a pointer to a slice of MappedWord and a string. It returns nothing.
+func mapWord(wg *sync.WaitGroup, keyValueChan chan pubsub.MappedWord, word string) {
 	defer wg.Done()
 	// Do some preprocessing on the word
 	preProcessedWord := preProcessWord(word)
@@ -74,11 +72,10 @@ func mapWord(wg *sync.WaitGroup, keyValueChan chan pubsub.MapperData, word strin
 	sort.Strings(splitWord)
 	sortedWord := strings.Join(splitWord, "")
 	// Use a map as the value in the key-value pair to avoid duplicates in later stages
-	anagrams := make(map[string]struct{})
 	// Add the word to the map with an empty struct as the value to save memory
-	anagrams[preProcessedWord] = struct{}{}
+	anagrams := map[string]struct{}{preProcessedWord: {}}
 	// Write the key-value pair to the channel
-	keyValueChan <- pubsub.MapperData{SortedWord: sortedWord, Anagrams: anagrams}
+	keyValueChan <- pubsub.MappedWord{SortedWord: sortedWord, Anagrams: anagrams}
 }
 
 // preProcessWord receives a lowercase word and strips any punctuation from the word. It also removes a word if it is

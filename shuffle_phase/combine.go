@@ -21,7 +21,7 @@ func Combine(ctx context.Context, e event.Event) error {
 	defer pubsubClient.Close()
 
 	// Read the data from the event i.e. message pushed from mapper
-	var wordData []pubsub.MapperData
+	var wordData []pubsub.MappedWord
 	attributes, err := pubsubClient.ReadPubSubMessage(&wordData)
 	if err != nil {
 		return err
@@ -39,9 +39,9 @@ func Combine(ctx context.Context, e event.Event) error {
 		}
 	}
 	// Convert the map to a slice of WordData
-	combinedKeyValues := make([]pubsub.MapperData, 0)
+	combinedKeyValues := make([]pubsub.MappedWord, 0)
 	for k, v := range combinedWordDataMap {
-		combinedKeyValues = append(combinedKeyValues, pubsub.MapperData{SortedWord: k, Anagrams: v})
+		combinedKeyValues = append(combinedKeyValues, pubsub.MappedWord{SortedWord: k, Anagrams: v})
 	}
 	// Send the combined key-value pairs to the Shuffler topic
 	pubsubClient.SendPubSubMessage(pubsub.SHUFFLER_TOPIC, combinedKeyValues, attributes)
