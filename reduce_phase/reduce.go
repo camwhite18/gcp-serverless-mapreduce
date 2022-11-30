@@ -60,6 +60,7 @@ func reduceAnagramsFromRedis(ctx context.Context, outputBucket, fileName, reduce
 	// Get all the keys from the redis instance
 	keys := r.MultiRedisClient[reducerNum].Keys(ctx, "*").Val()
 	var wg sync.WaitGroup
+	var mu sync.Mutex
 	// Loop through each key and get the values
 	for _, key := range keys {
 		wg.Add(1)
@@ -76,8 +77,10 @@ func reduceAnagramsFromRedis(ctx context.Context, outputBucket, fileName, reduce
 			if len(reducedAnagrams) > 1 {
 				// Sort the anagrams alphabetically
 				sort.Strings(reducedAnagrams)
-				// Write the key-value pairs to the output file
+				// Write the key-value pairs to the output file and use a mutex to prevent race conditions
+				mu.Lock()
 				storageClient.WriteData(key, reducedAnagrams)
+				mu.Unlock()
 			}
 		}(key)
 	}
