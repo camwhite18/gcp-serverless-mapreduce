@@ -1,14 +1,13 @@
 package map_phase
 
 import (
-	"cloud.google.com/go/storage"
 	"context"
 	"encoding/binary"
 	"fmt"
 	"github.com/cloudevents/sdk-go/v2/event"
 	"github.com/google/uuid"
 	"gitlab.com/cameron_w20/serverless-mapreduce/pubsub"
-	"io"
+	"gitlab.com/cameron_w20/serverless-mapreduce/storage"
 	"log"
 	"math"
 	"regexp"
@@ -53,8 +52,14 @@ func Splitter(ctx context.Context, e event.Event) error {
 // splitFile reads a given file from a bucket, removes the text's header and footer, splits it into partitions and
 // returns the partitions as a slice of slices of strings or an error
 func splitFile(ctx context.Context, bucketName, fileName string) ([][]string, error) {
+	// Create a storage client
+	storageClient, err := storage.New(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer storageClient.Close()
 	// Read the contents of the file from the bucket
-	data, err := readFileFromBucket(ctx, bucketName, fileName)
+	data, err := storageClient.ReadObject(ctx, bucketName, fileName)
 	if err != nil {
 		return nil, fmt.Errorf("error reading file from bucket: %v", err)
 	}
@@ -67,28 +72,6 @@ func splitFile(ctx context.Context, bucketName, fileName string) ([][]string, er
 	// Partition the file since this will speed up the map phase
 	partitionedText := partitionFile(uniqueSplitText, pubsub.MAX_MESSAGE_SIZE_BYTES)
 	return partitionedText, nil
-}
-
-// readFileFromBucket reads a given file from a bucket and returns the data as a byte array or an error
-func readFileFromBucket(ctx context.Context, bucketName, objectName string) ([]byte, error) {
-	// Create a storage client
-	client, err := storage.NewClient(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer client.Close()
-	// Create a reader for the file
-	rc, err := client.Bucket(bucketName).Object(objectName).NewReader(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer rc.Close()
-	// Read the contents of the file
-	data, err := io.ReadAll(rc)
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
 }
 
 // removeBookHeaderAndFooter removes the header and footer from the given text and returns the text as a byte array
@@ -159,12 +142,6 @@ func partitionFile(splitText []string, messageSize int) [][]string {
 // sendTextToMapper sends the given text to the Mapper and returns an error
 func sendTextToMapper(pubsubClient pubsub.Client, attributes map[string]string,
 	partitionedText [][]string) error {
-	// Create a client for the Mapper topic
-	//mapperTopic := client.Topic(tools.MAPPER_TOPIC)
-	//defer mapperTopic.Stop()
-	// Create a client for the controller topic
-	//controllerTopic := client.Topic(tools.CONTROLLER_TOPIC)
-	//defer controllerTopic.Stop()
 	// We need to use a wait group to wait for all the messages to be published before returning
 	var wg sync.WaitGroup
 	for _, partition := range partitionedText {
@@ -173,22 +150,27 @@ func sendTextToMapper(pubsubClient pubsub.Client, attributes map[string]string,
 		for k, v := range attributes {
 			partitionAttributes[k] = v
 		}
-		// Create a unique id for the partition so that we can track it
-		partitionAttributes["partitionId"] = uuid.New().String()
-		statusMessage := pubsub.ControllerMessage{
-			Id:     partitionAttributes["partitionId"],
-			Status: pubsub.STATUS_STARTED,
-		}
 		// Send the message concurrently to speed up the process
 		wg.Add(1)
 		go func(partition []string) {
 			defer wg.Done()
+			// Send a message to the controller topic to let it know that a partition has been published
+			sendIdToController(pubsubClient, partitionAttributes)
 			// Publish the partition to the Mapper topic
 			pubsubClient.SendPubSubMessage(pubsub.MAPPER_TOPIC, partition, partitionAttributes)
-			// Send a message to the controller topic to let it know that a partition has been published
-			pubsubClient.SendPubSubMessage(pubsub.CONTROLLER_TOPIC, statusMessage, nil)
 		}(partition)
 	}
 	wg.Wait()
 	return nil
+}
+
+func sendIdToController(pubsubClient pubsub.Client, attributes map[string]string) {
+	// Create a unique id for the partition so that we can track it
+	attributes["partitionId"] = uuid.New().String()
+	statusMessage := pubsub.ControllerMessage{
+		Id:     attributes["partitionId"],
+		Status: pubsub.STATUS_STARTED,
+	}
+	// Send the message to the controller
+	pubsubClient.SendPubSubMessage(pubsub.CONTROLLER_TOPIC, statusMessage, nil)
 }

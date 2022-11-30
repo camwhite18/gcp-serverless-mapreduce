@@ -1,15 +1,14 @@
 package reduce_phase
 
 import (
-	"cloud.google.com/go/storage"
 	"context"
 	"fmt"
 	"github.com/cloudevents/sdk-go/v2/event"
 	"gitlab.com/cameron_w20/serverless-mapreduce/pubsub"
 	r "gitlab.com/cameron_w20/serverless-mapreduce/redis"
+	"gitlab.com/cameron_w20/serverless-mapreduce/storage"
 	"log"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 )
@@ -38,22 +37,19 @@ func Reducer(ctx context.Context, e event.Event) error {
 	//Initialize the redis pool if it hasn't been initialized yet
 	r.InitMultiRedisClient()
 	// Create a new storage client
-	client, err := storage.NewClient(ctx)
+	storageClient, err := storage.New(ctx)
 	if err != nil {
-		return fmt.Errorf("error creating storage client: %v", err)
+		return err
 	}
-	defer client.Close()
-	// Create a writer to write to the file in the output bucket
-	writer := client.Bucket(outputBucket).Object(fileName).NewWriter(ctx)
-	defer writer.Close()
-
+	defer storageClient.Close()
+	storageClient.CreateWriter(ctx, outputBucket, fileName)
 	// Create a channel to read the keys from redis
 	keysChan := make(chan string)
 	// Read the keys from redis
 	readKeysFromRedis(ctx, keysChan, reducerNum)
 	// Get the values for each key from the redis instance
 	var wg sync.WaitGroup
-	readAnagramsFromRedis(ctx, &wg, keysChan, writer, reducerNum)
+	readAnagramsFromRedis(ctx, &wg, keysChan, storageClient, reducerNum)
 	wg.Wait()
 	res := r.MultiRedisClient[reducerNum].FlushAll(ctx)
 	if res.Err() != nil {
@@ -76,7 +72,7 @@ func readKeysFromRedis(ctx context.Context, keysChan chan string, reducerNum str
 	}()
 }
 
-func readAnagramsFromRedis(ctx context.Context, wg *sync.WaitGroup, keysChan chan string, writer *storage.Writer, reducerNum string) {
+func readAnagramsFromRedis(ctx context.Context, wg *sync.WaitGroup, keysChan chan string, storageClient storage.Client, reducerNum string) {
 	for key := range keysChan {
 		res := r.MultiRedisClient[reducerNum].LRange(ctx, key, 0, -1)
 		if res.Err() != nil {
@@ -85,15 +81,16 @@ func readAnagramsFromRedis(ctx context.Context, wg *sync.WaitGroup, keysChan cha
 		wg.Add(1)
 		go func(key string) {
 			defer wg.Done()
-			reducedAnagrams := reduceAnagramsAndSort(res.Val())
+			reducedAnagrams := reduceAnagrams(res.Val())
 			if len(reducedAnagrams) > 1 {
-				_, _ = writer.Write([]byte(fmt.Sprintf("%s: %s\n", key, strings.Join(reducedAnagrams, " "))))
+				sort.Strings(reducedAnagrams)
+				storageClient.WriteData(key, reducedAnagrams)
 			}
 		}(key)
 	}
 }
 
-func reduceAnagramsAndSort(values []string) []string {
+func reduceAnagrams(values []string) []string {
 	var reducedAnagrams []string
 	var anagramMap = make(map[string]struct{})
 	for _, value := range values {
@@ -102,6 +99,5 @@ func reduceAnagramsAndSort(values []string) []string {
 	for key := range anagramMap {
 		reducedAnagrams = append(reducedAnagrams, key)
 	}
-	sort.Strings(reducedAnagrams)
 	return reducedAnagrams
 }
