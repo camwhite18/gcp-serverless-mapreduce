@@ -188,5 +188,3 @@ func TestStartMapReduce_NoInputBucketProvidedError(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 	assert.Equal(t, expectedResponse, rec.Body.String())
 }
-
-// TODO: Create tests for other responses

@@ -75,7 +75,7 @@ func TestMapper_ReadPubSubMessageError(t *testing.T) {
 	defer teardown(t)
 	// Given
 	// Create a message
-	inputData := []int{1, 2, 3, 4, 5}
+	inputData := []int{1, 2, 3}
 	inputDataBytes, err := json.Marshal(inputData)
 	if err != nil {
 		t.Fatalf("Error marshalling Mapper data: %v", err)

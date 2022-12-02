@@ -71,3 +71,66 @@ func TestCombine(t *testing.T) {
 	// Ensure there are no errors returned by the receiver
 	assert.Nil(t, err)
 }
+
+func TestCombine_ReadPubSubMessageError(t *testing.T) {
+	// Setup test
+	teardown, _ := test.SetupTest(t, []string{pubsub.SHUFFLER_TOPIC})
+	defer teardown(t)
+	// Given
+	// Create a message
+	inputData := []int{1, 2, 3}
+	inputDataBytes, err := json.Marshal(inputData)
+	if err != nil {
+		t.Fatalf("Error marshalling mapper data: %v", err)
+	}
+	message := pubsub.MessagePublishedData{
+		Message: pubsub.PubSubMessage{
+			Data:       inputDataBytes,
+			Attributes: make(map[string]string),
+		},
+	}
+	// Create a CloudEvent to be sent to the mapper
+	e := event.New()
+	e.SetDataContentType("application/json")
+	err = e.SetData(e.DataContentType(), message)
+	if err != nil {
+		t.Fatalf("Error setting event data: %v", err)
+	}
+
+	// When
+	err = Combine(context.Background(), e)
+
+	// Then
+	assert.NotNil(t, err)
+	assert.Contains(t, err.Error(), "error unmarshalling message")
+}
+
+func TestCombine_CreatePubSubClientError(t *testing.T) {
+	// Given
+	// Create a message
+	inputData := []int{1, 2, 3}
+	inputDataBytes, err := json.Marshal(inputData)
+	if err != nil {
+		t.Fatalf("Error marshalling mapper data: %v", err)
+	}
+	message := pubsub.MessagePublishedData{
+		Message: pubsub.PubSubMessage{
+			Data:       inputDataBytes,
+			Attributes: make(map[string]string),
+		},
+	}
+	// Create a CloudEvent to be sent to the mapper
+	e := event.New()
+	e.SetDataContentType("application/json")
+	err = e.SetData(e.DataContentType(), message)
+	if err != nil {
+		t.Fatalf("Error setting event data: %v", err)
+	}
+
+	// When
+	err = Combine(context.Background(), e)
+
+	// Then
+	assert.NotNil(t, err)
+	assert.Contains(t, err.Error(), "error creating pubsub client")
+}
