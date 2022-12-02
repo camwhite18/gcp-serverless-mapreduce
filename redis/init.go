@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-const NO_OF_REDUCER_INSTANCES = 5
+const NO_OF_REDIS_INSTANCES = 5
 
 var RedisClient *redis.Client
 var MultiRedisClient map[string]*redis.Client

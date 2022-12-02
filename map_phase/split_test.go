@@ -7,22 +7,22 @@ import (
 	"github.com/cloudevents/sdk-go/v2/event"
 	"github.com/stretchr/testify/assert"
 	"gitlab.com/cameron_w20/serverless-mapreduce/pubsub"
-	"gitlab.com/cameron_w20/serverless-mapreduce/tools"
+	"gitlab.com/cameron_w20/serverless-mapreduce/test"
 	"testing"
 	"time"
 )
 
 func TestSplitter(t *testing.T) {
 	// Setup test
-	teardown, subscriptions := tools.SetupTest(t, []string{pubsub.MAPPER_TOPIC, pubsub.CONTROLLER_TOPIC})
+	teardown, subscriptions := test.SetupTest(t, []string{pubsub.MAPPER_TOPIC, pubsub.CONTROLLER_TOPIC})
 	defer teardown(t)
-	teardownTestStorage := tools.CreateTestStorage(t)
+	teardownTestStorage := test.CreateTestStorage(t)
 	defer teardownTestStorage(t)
 
 	// Given
 	// Create a message
 	inputData := pubsub.SplitterData{
-		BucketName: tools.INPUT_BUCKET_NAME,
+		BucketName: test.INPUT_BUCKET_NAME,
 		FileName:   "test.txt",
 	}
 	inputDataBytes, err := json.Marshal(inputData)

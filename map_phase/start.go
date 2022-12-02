@@ -6,6 +6,7 @@ import (
 	"gitlab.com/cameron_w20/serverless-mapreduce/pubsub"
 	"gitlab.com/cameron_w20/serverless-mapreduce/storage"
 	"net/http"
+	"strings"
 	"sync"
 )
 
@@ -24,12 +25,12 @@ func StartMapReduce(w http.ResponseWriter, r *http.Request) {
 	// Get the query parameters
 	inputBucketName := r.URL.Query().Get("input-bucket")
 	if inputBucketName == "" {
-		writeResponse(w, http.StatusBadRequest, "No input bucket name provided")
+		writeResponse(w, http.StatusBadRequest, "No input bucket name provided, please provide one using the query parameter 'input-bucket'")
 		return
 	}
 	outputBucketName := r.URL.Query().Get("output-bucket")
 	if outputBucketName == "" {
-		writeResponse(w, http.StatusBadRequest, "No output bucket name provided")
+		writeResponse(w, http.StatusBadRequest, "No output bucket name provided, please provide one using the query parameter 'output-bucket'")
 		return
 	}
 	// Create a storage client
@@ -42,12 +43,16 @@ func StartMapReduce(w http.ResponseWriter, r *http.Request) {
 	// Read the file names in the input bucket
 	files, err := storageClient.ReadObjectNames(ctx, inputBucketName)
 	if err != nil {
+		if strings.Contains(err.Error(), "bucket doesn't exist") {
+			writeResponse(w, http.StatusBadRequest, "Storage bucket doesn't exist or isn't accessible")
+			return
+		}
 		writeResponse(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	// If there are no files in the bucket, write bad request response and return
 	if len(files) == 0 {
-		writeResponse(w, http.StatusBadRequest, "No files found in bucket")
+		writeResponse(w, http.StatusBadRequest, "No files found in input bucket: "+inputBucketName)
 		return
 	}
 	// Create a new pubsub client with a blank event

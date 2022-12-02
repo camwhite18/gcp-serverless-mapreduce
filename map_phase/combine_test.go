@@ -7,14 +7,14 @@ import (
 	"github.com/cloudevents/sdk-go/v2/event"
 	"github.com/stretchr/testify/assert"
 	"gitlab.com/cameron_w20/serverless-mapreduce/pubsub"
-	"gitlab.com/cameron_w20/serverless-mapreduce/tools"
+	"gitlab.com/cameron_w20/serverless-mapreduce/test"
 	"testing"
 	"time"
 )
 
 func TestCombine(t *testing.T) {
 	// Setup test
-	teardown, subscriptions := tools.SetupTest(t, []string{pubsub.SHUFFLER_TOPIC})
+	teardown, subscriptions := test.SetupTest(t, []string{pubsub.SHUFFLER_TOPIC})
 	defer teardown(t)
 	// Given
 	// Create a message

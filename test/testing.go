@@ -1,4 +1,4 @@
-package tools
+package test
 
 import (
 	"cloud.google.com/go/pubsub"
@@ -69,7 +69,7 @@ func SetupTest(tb testing.TB, topicIDs []string) (func(tb testing.TB), []*pubsub
 
 func CreateTestStorage(tb testing.TB) func(tb testing.TB) {
 	// Setup test
-	ctx := context.Background()
+	createStorageCtx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	// Modify the STORAGE_EMULATOR_HOST environment variable to point to the storage emulator
 	existingStorageVal := os.Getenv("STORAGE_EMULATOR_HOST")
 	err := os.Setenv("STORAGE_EMULATOR_HOST", "localhost:9023")
@@ -77,13 +77,13 @@ func CreateTestStorage(tb testing.TB) func(tb testing.TB) {
 		tb.Fatalf("Error setting environment variable: %v", err)
 	}
 	// Create a storage client so we can create buckets
-	client, err := storage.NewClient(ctx)
+	client, err := storage.NewClient(createStorageCtx)
 	if err != nil {
 		tb.Fatalf("Error creating storage client: %v", err)
 	}
 	// Create the input bucket
 	inputBucket := client.Bucket(INPUT_BUCKET_NAME)
-	createStorageCtx, cancel := context.WithTimeout(ctx, time.Second*10)
+
 	defer cancel()
 	if err := inputBucket.Create(createStorageCtx, "serverless-mapreduce", nil); err != nil &&
 		!strings.Contains(err.Error(), "already own this bucket") {
@@ -101,16 +101,15 @@ func CreateTestStorage(tb testing.TB) func(tb testing.TB) {
 	}
 	// Create the output bucket
 	outputBucket := client.Bucket(OUTPUT_BUCKET_NAME)
-	createOutputStorageCtx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
-	if err := outputBucket.Create(createOutputStorageCtx, "serverless-mapreduce", nil); err != nil &&
+	if err := outputBucket.Create(createStorageCtx, "serverless-mapreduce", nil); err != nil &&
 		!strings.Contains(err.Error(), "already own this bucket") {
 		tb.Fatalf("Error creating inputBucket: %v", err)
 	}
 
 	return func(tb testing.TB) {
 		// Teardown test
-		deleteStorageCtx, cancel := context.WithTimeout(ctx, time.Second*10)
+		deleteStorageCtx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 		defer cancel()
 		// Delete the file in the bucket
 		if err := object.Delete(deleteStorageCtx); err != nil {
@@ -154,7 +153,11 @@ func SetupRedisTest(tb testing.TB) func(tb testing.TB) {
 		tb.Fatalf("Error setting environment variable: %v", err)
 	}
 	existingRedisHostsVal := os.Getenv("REDIS_HOSTS")
-	err = os.Setenv("REDIS_HOSTS", "localhost localhost localhost localhost localhost")
+	var redisHosts []string
+	for i := 0; i < redis.NO_OF_REDIS_INSTANCES; i++ {
+		redisHosts = append(redisHosts, "localhost")
+	}
+	err = os.Setenv("REDIS_HOSTS", strings.Join(redisHosts, " "))
 	if err != nil {
 		tb.Fatalf("Error setting environment variable: %v", err)
 	}

@@ -50,9 +50,11 @@ func (c *clientImpl) Close() {
 	if err != nil {
 		log.Println("Error closing storage client: ", err)
 	}
-	err = c.writer.Close()
-	if err != nil {
-		log.Println("Error closing storage writer: ", err)
+	if c.writer != nil {
+		err = c.writer.Close()
+		if err != nil {
+			log.Println("Error closing storage writer: ", err)
+		}
 	}
 }
 

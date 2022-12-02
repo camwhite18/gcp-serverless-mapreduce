@@ -85,7 +85,7 @@ func partitioner(s string) int {
 	_, _ = h.Write([]byte(s))
 	hashedString := h.Sum32()
 	// Take the modulus of the hashed word with the total number of reducers
-	return int(hashedString % uint32(r.NO_OF_REDUCER_INSTANCES))
+	return int(hashedString % uint32(r.NO_OF_REDIS_INSTANCES))
 }
 
 // addToRedis takes a map of reducer number to a list of MappedWord objects and adds each list of MappedWord objects

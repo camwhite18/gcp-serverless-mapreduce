@@ -65,7 +65,7 @@ func checkSetCardinality(ctx context.Context, client pubsub.Client, attributes m
 	if cardinality == int64(0) {
 		// Send a message to start a reducer job on each redis instance
 		var wg sync.WaitGroup
-		for i := 0; i < r.NO_OF_REDUCER_INSTANCES; i++ {
+		for i := 0; i < r.NO_OF_REDIS_INSTANCES; i++ {
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()

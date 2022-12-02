@@ -6,15 +6,15 @@ import (
 	"github.com/cloudevents/sdk-go/v2/event"
 	"github.com/stretchr/testify/assert"
 	"gitlab.com/cameron_w20/serverless-mapreduce/pubsub"
-	"gitlab.com/cameron_w20/serverless-mapreduce/tools"
+	"gitlab.com/cameron_w20/serverless-mapreduce/test"
 	"testing"
 )
 
 func TestShuffler(t *testing.T) {
 	// Setup test
-	teardown, _ := tools.SetupTest(t, []string{pubsub.CONTROLLER_TOPIC})
+	teardown, _ := test.SetupTest(t, []string{pubsub.CONTROLLER_TOPIC})
 	defer teardown(t)
-	teardownRedis := tools.SetupRedisTest(t)
+	teardownRedis := test.SetupRedisTest(t)
 	defer teardownRedis(t)
 	// Given
 	// Create a message
@@ -54,7 +54,7 @@ func TestPartition(t *testing.T) {
 	inputData := "acer"
 
 	// When
-	reducerNum := partition(inputData)
+	reducerNum := partitioner(inputData)
 
 	// Then
 	assert.Equal(t, 1, reducerNum)
