@@ -3,7 +3,6 @@ package reduce_phase
 import (
 	"cloud.google.com/go/storage"
 	"context"
-	"encoding/json"
 	"github.com/cloudevents/sdk-go/v2/event"
 	"github.com/stretchr/testify/assert"
 	"gitlab.com/cameron_w20/serverless-mapreduce/pubsub"
@@ -23,27 +22,21 @@ func TestReducer(t *testing.T) {
 	teardownRedis := test.SetupRedisTest(t)
 	defer teardownRedis(t)
 
-	inputDataBytes, err := json.Marshal(nil)
-	if err != nil {
-		t.Fatalf("Error marshalling mapper data: %v", err)
-	}
 	message := pubsub.MessagePublishedData{
 		Message: pubsub.PubSubMessage{
-			Data:       inputDataBytes,
-			Attributes: map[string]string{"outputBucket": test.OUTPUT_BUCKET_NAME, "reducerNum": "1"},
+			Attributes: map[string]string{"outputBucket": test.OUTPUT_BUCKET_NAME, "redisNum": "1"},
 		},
 	}
 	// Create a CloudEvent to be sent to the mapper
 	e := event.New()
 	e.SetDataContentType("application/json")
-	err = e.SetData(e.DataContentType(), message)
+	err := e.SetData(e.DataContentType(), message)
 	if err != nil {
 		t.Fatalf("Error setting event data: %v", err)
 	}
 
-	redis.InitRedisClient()
-	redis.RedisClient.LPush(context.Background(), "acer", "race", "race", "care", "race")
-	redis.RedisClient.LPush(context.Background(), "aprt", "part", "trap", "trap", "part")
+	redis.MultiRedisClient["1"].LPush(context.Background(), "acer", "race", "race", "care", "race")
+	redis.MultiRedisClient["1"].LPush(context.Background(), "aprt", "part", "trap", "trap", "part")
 
 	expectedResult1 := "acer: care race\n"
 	expectedResult2 := "aprt: part trap\n"
@@ -74,4 +67,60 @@ func TestReducer(t *testing.T) {
 	// Check that the data is correct
 	assert.Contains(t, string(actualResult), expectedResult1)
 	assert.Contains(t, string(actualResult), expectedResult2)
+}
+
+func TestReducer_CreateStorageClientWithWriterError(t *testing.T) {
+	// Given
+	teardown, _ := test.SetupTest(t, []string{})
+	defer teardown(t)
+	teardownRedis := test.SetupRedisTest(t)
+	defer teardownRedis(t)
+
+	message := pubsub.MessagePublishedData{
+		Message: pubsub.PubSubMessage{
+			Attributes: map[string]string{"outputBucket": test.OUTPUT_BUCKET_NAME, "redisNum": "1"},
+		},
+	}
+	// Create a CloudEvent to be sent to the mapper
+	e := event.New()
+	e.SetDataContentType("application/json")
+	err := e.SetData(e.DataContentType(), message)
+	if err != nil {
+		t.Fatalf("Error setting event data: %v", err)
+	}
+
+	// When
+	err = Reducer(context.Background(), e)
+
+	// Then
+	assert.NotNil(t, err)
+	assert.Contains(t, err.Error(), "error creating storage client:")
+}
+
+func TestReducer_CreatePubSubClientError(t *testing.T) {
+	// Given
+	teardownStorage := test.CreateTestStorage(t)
+	defer teardownStorage(t)
+	teardownRedis := test.SetupRedisTest(t)
+	defer teardownRedis(t)
+
+	message := pubsub.MessagePublishedData{
+		Message: pubsub.PubSubMessage{
+			Attributes: map[string]string{"outputBucket": test.OUTPUT_BUCKET_NAME, "redisNum": "1"},
+		},
+	}
+	// Create a CloudEvent to be sent to the mapper
+	e := event.New()
+	e.SetDataContentType("application/json")
+	err := e.SetData(e.DataContentType(), message)
+	if err != nil {
+		t.Fatalf("Error setting event data: %v", err)
+	}
+
+	// When
+	err = Reducer(context.Background(), e)
+
+	// Then
+	assert.NotNil(t, err)
+	assert.Contains(t, err.Error(), "error creating pubsub client")
 }

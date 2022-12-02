@@ -7,14 +7,15 @@ DEFAULT_THRESHOLD=90
 declare -A SPECIFIC_THRESHOLDS
 
 # unit test thresholds
-SPECIFIC_THRESHOLDS[gitlab.com/cameron_w20/serverless_mapreduce]=0
+SPECIFIC_THRESHOLDS[gitlab.com/cameron_w20/serverless-mapreduce]=0
+SPECIFIC_THRESHOLDS[gitlab.com/cameron_w20/serverless-mapreduce/test]=0
 
 go clean -testcache
 
 RESULT="PASS"
 
 # unit tests
-packages=$(go list ./...)
+packages=$(go list ./... | grep -v /test/)
 for p in $packages; do
     coverage="$(go test -cover "$p" | awk '{print $(NF-2)}' | grep -Eo '^[0-9]+' || true)"
     if [ -z "$coverage" ]; then

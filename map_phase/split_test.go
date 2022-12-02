@@ -164,7 +164,7 @@ func TestSplitter_CreateStorageClientError(t *testing.T) {
 
 	// Then
 	assert.NotNil(t, err)
-	assert.Contains(t, err.Error(), "error splitting file:")
+	assert.Contains(t, err.Error(), "error creating storage client:")
 }
 
 func TestSplitter_ReadPubSubMessageError(t *testing.T) {

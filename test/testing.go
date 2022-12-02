@@ -162,6 +162,7 @@ func SetupRedisTest(tb testing.TB) func(tb testing.TB) {
 		tb.Fatalf("Error setting environment variable: %v", err)
 	}
 	redis.InitRedisClient()
+	redis.InitMultiRedisClient()
 
 	return func(tb testing.TB) {
 		// Teardown test

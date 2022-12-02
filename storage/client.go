@@ -27,7 +27,7 @@ var _ Client = &clientImpl{}
 func New(ctx context.Context) (Client, error) {
 	client, err := storage.NewClient(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error creating storage client: %v", err)
 	}
 	return &clientImpl{
 		client: client,
@@ -37,7 +37,7 @@ func New(ctx context.Context) (Client, error) {
 func NewWithWriter(ctx context.Context, bucketName, objectName string) (Client, error) {
 	client, err := storage.NewClient(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error creating storage client: %v", err)
 	}
 	return &clientImpl{
 		client: client,

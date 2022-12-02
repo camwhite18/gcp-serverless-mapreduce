@@ -48,11 +48,18 @@ func TestShuffler(t *testing.T) {
 	// Ensure there are no errors returned
 	assert.Nil(t, err)
 	// Check that the data was stored in Redis
-	result, err := redis.MultiRedisClient["1"].LRange(context.Background(), "acer", 0, -1).Result()
+	result1, err := redis.MultiRedisClient["1"].LRange(context.Background(), "acer", 0, -1).Result()
 	if err != nil {
 		t.Fatalf("Error getting data from Redis: %v", err)
 	}
-	assert.Equal(t, []string{"race", "care"}, result)
+	result2, err := redis.MultiRedisClient["1"].LRange(context.Background(), "aprt", 0, -1).Result()
+	if err != nil {
+		t.Fatalf("Error getting data from Redis: %v", err)
+	}
+	assert.Contains(t, result1, "care")
+	assert.Contains(t, result1, "race")
+	assert.Contains(t, result2, "part")
+	assert.Contains(t, result2, "trap")
 }
 
 func TestShuffler_ReadPubSubMessageError(t *testing.T) {

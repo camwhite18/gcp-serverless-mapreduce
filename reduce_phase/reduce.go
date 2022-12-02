@@ -74,7 +74,8 @@ func reduceAnagramsFromRedis(ctx context.Context, outputBucket, fileName, redisN
 			// Use LRange to get all the values in the list for the key
 			res := r.MultiRedisClient[redisNum].LRange(ctx, key, 0, -1)
 			if res.Err() != nil {
-				log.Printf("error getting value from redis: %v", res.Err())
+				err = fmt.Errorf("error getting value from redis: %v", res.Err())
+				return
 			}
 			// Remove any duplicate anagrams in the slice
 			reducedAnagrams := reduceAnagrams(res.Val())
@@ -91,7 +92,7 @@ func reduceAnagramsFromRedis(ctx context.Context, outputBucket, fileName, redisN
 	}
 	// Wait until all the key, list of anagrams pairs have been processed
 	wg.Wait()
-	return nil
+	return err
 }
 
 // reduceAnagrams removes any duplicate anagrams from the slice
