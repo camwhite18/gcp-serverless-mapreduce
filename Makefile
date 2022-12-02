@@ -75,10 +75,10 @@ remove-mapper:
 	./map_phase/delete-mapper.sh
 
 deploy-combine:
-	./shuffle_phase/deploy-combine.sh
+	./map_phase/deploy-combine.sh
 
 remove-combine:
-	./shuffle_phase/delete-combine.sh
+	./map_phase/delete-combine.sh
 
 deploy-shuffler:
 	./shuffle_phase/deploy-shuffler.sh

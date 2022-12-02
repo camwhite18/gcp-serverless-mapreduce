@@ -1,4 +1,4 @@
-package shuffle_phase
+package map_phase
 
 import (
 	ps "cloud.google.com/go/pubsub"

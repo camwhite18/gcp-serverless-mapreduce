@@ -14,7 +14,7 @@ func init() {
 	functions.CloudEvent("Controller", controller.Controller)
 	functions.CloudEvent("Splitter", map_phase.Splitter)
 	functions.CloudEvent("Mapper", map_phase.Mapper)
-	functions.CloudEvent("Combiner", shuffle_phase.Combine)
+	functions.CloudEvent("Combiner", map_phase.Combine)
 	functions.CloudEvent("Shuffler", shuffle_phase.Shuffler)
 	functions.CloudEvent("Reducer", reduce_phase.Reducer)
 }
