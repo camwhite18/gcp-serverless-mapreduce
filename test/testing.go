@@ -161,10 +161,10 @@ func SetupRedisTest(tb testing.TB) func(tb testing.TB) {
 	if err != nil {
 		tb.Fatalf("Error setting environment variable: %v", err)
 	}
+	redis.InitRedisClient()
 
 	return func(tb testing.TB) {
 		// Teardown test
-		redis.InitRedisClient()
 		redis.RedisClient.FlushAll(context.Background())
 		// Reset the REDIS_HOST environment variable
 		err = os.Setenv("REDIS_HOSTS", existingRedisHostsVal)

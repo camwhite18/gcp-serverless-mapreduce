@@ -2,6 +2,7 @@ package shuffle_phase
 
 import (
 	"context"
+	"fmt"
 	"github.com/cloudevents/sdk-go/v2/event"
 	"gitlab.com/cameron_w20/serverless-mapreduce/pubsub"
 	r "gitlab.com/cameron_w20/serverless-mapreduce/redis"
@@ -38,7 +39,7 @@ func Shuffler(ctx context.Context, e event.Event) error {
 	// Add each list of MappedWord objects to the correct redis instance
 	err = addToRedis(ctx, shuffledText)
 	if err != nil {
-		return err
+		return fmt.Errorf("error adding to redis: %v", err)
 	}
 	// Send a message to the controller topic to let it know that the shuffling is complete for the partition
 	statusMessage := pubsub.ControllerMessage{
@@ -91,6 +92,7 @@ func partitioner(s string) int {
 // addToRedis takes a map of reducer number to a list of MappedWord objects and adds each list of MappedWord objects
 // to the appropriate redis instance
 func addToRedis(ctx context.Context, shuffledText map[int][]pubsub.MappedWord) error {
+	var err error
 	var wg sync.WaitGroup
 	// Loop through each reducer number and add the list of MappedWord objects to the appropriate redis instance
 	for reducerNum := range shuffledText {
@@ -107,12 +109,12 @@ func addToRedis(ctx context.Context, shuffledText map[int][]pubsub.MappedWord) e
 				// Push the anagrams into the list for the sorted word in the redis instance
 				res := r.MultiRedisClient[strconv.Itoa(reducerNum)].LPush(ctx, value.SortedWord, anagrams...)
 				if res.Err() != nil {
-					log.Println(res.Err())
+					err = res.Err()
 				}
 			}
 		}(reducerNum)
 	}
 	// Wait for all the words to be added to each redis instance
 	wg.Wait()
-	return nil
+	return err
 }
