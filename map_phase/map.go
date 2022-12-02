@@ -107,9 +107,10 @@ func preProcessWord(word string) string {
 		"your": {},
 	}
 	// Remove any punctuation from the start and end of the word
-	word = strings.Trim(word, ".,;:!?()'\" ")
+	numbersAndSymbols := "0123456789*+-_&^%$#@!~`|}{[]\\:;\"'<>,.?/() "
+	word = strings.Trim(word, numbersAndSymbols)
 	// Remove the word if it is a stopword, or contains numbers or symbols
-	if _, ok := stopwords[word]; ok || strings.ContainsAny(word, "0123456789*+-_&^%$#@!~`|}{[]\\:;\"'<>,.?/()") {
+	if _, ok := stopwords[word]; ok || strings.ContainsAny(word, numbersAndSymbols) {
 		return ""
 	}
 	return word

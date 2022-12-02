@@ -18,7 +18,7 @@ func TestMapper(t *testing.T) {
 	defer teardown(t)
 	// Given
 	// Create a message
-	inputData := []string{"quick", "brown", "fox", "quick"}
+	inputData := []string{"the", "quick", "brown", "fox", "quick"}
 	inputDataBytes, err := json.Marshal(inputData)
 	if err != nil {
 		t.Fatalf("Error marshalling Mapper data: %v", err)
@@ -67,6 +67,69 @@ func TestMapper(t *testing.T) {
 	}
 	// Ensure there are no errors returned by the receiver
 	assert.Nil(t, err)
+}
+
+func TestMapper_ReadPubSubMessageError(t *testing.T) {
+	// Setup test
+	teardown, _ := test.SetupTest(t, []string{pubsub.COMBINE_TOPIC})
+	defer teardown(t)
+	// Given
+	// Create a message
+	inputData := []int{1, 2, 3, 4, 5}
+	inputDataBytes, err := json.Marshal(inputData)
+	if err != nil {
+		t.Fatalf("Error marshalling Mapper data: %v", err)
+	}
+	message := pubsub.MessagePublishedData{
+		Message: pubsub.PubSubMessage{
+			Data:       inputDataBytes,
+			Attributes: make(map[string]string),
+		},
+	}
+	// Create a CloudEvent to be sent to the Mapper
+	e := event.New()
+	e.SetDataContentType("application/json")
+	err = e.SetData(e.DataContentType(), message)
+	if err != nil {
+		t.Fatalf("Error setting event data: %v", err)
+	}
+
+	// When
+	err = Mapper(context.Background(), e)
+
+	// Then
+	assert.NotNil(t, err)
+	assert.Contains(t, err.Error(), "error unmarshalling message")
+}
+
+func TestMapper_CreatePubSubClientError(t *testing.T) {
+	// Given
+	// Create a message
+	inputData := []string{"the", "quick", "brown", "fox", "quick"}
+	inputDataBytes, err := json.Marshal(inputData)
+	if err != nil {
+		t.Fatalf("Error marshalling Mapper data: %v", err)
+	}
+	message := pubsub.MessagePublishedData{
+		Message: pubsub.PubSubMessage{
+			Data:       inputDataBytes,
+			Attributes: make(map[string]string),
+		},
+	}
+	// Create a CloudEvent to be sent to the Mapper
+	e := event.New()
+	e.SetDataContentType("application/json")
+	err = e.SetData(e.DataContentType(), message)
+	if err != nil {
+		t.Fatalf("Error setting event data: %v", err)
+	}
+
+	// When
+	err = Mapper(context.Background(), e)
+
+	// Then
+	assert.NotNil(t, err)
+	assert.Contains(t, err.Error(), "error creating pubsub client")
 }
 
 func TestProcessText(t *testing.T) {
