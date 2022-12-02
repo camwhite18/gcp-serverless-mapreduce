@@ -70,8 +70,10 @@ func (c *clientImpl) ReadObjectNames(ctx context.Context, bucketName string) ([]
 		if err != nil {
 			return nil, err
 		}
-		// Add the file name to the list of files
-		files = append(files, attributes.Name)
+		// Add the file name to the list of files if it is a text file
+		if strings.HasSuffix(attributes.Name, ".txt") {
+			files = append(files, attributes.Name)
+		}
 	}
 	return files, nil
 }
