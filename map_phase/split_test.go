@@ -91,6 +91,115 @@ func TestSplitter(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+func TestSplitter_ReadFileError(t *testing.T) {
+	// Setup test
+	teardown, _ := test.SetupTest(t, []string{pubsub.MAPPER_TOPIC, pubsub.CONTROLLER_TOPIC})
+	defer teardown(t)
+	teardownTestStorage := test.CreateTestStorage(t)
+	defer teardownTestStorage(t)
+
+	// Given
+	// Create a message
+	inputData := pubsub.SplitterData{
+		BucketName: test.INPUT_BUCKET_NAME,
+		FileName:   "invalid-file.txt",
+	}
+	inputDataBytes, err := json.Marshal(inputData)
+	if err != nil {
+		t.Fatalf("Error marshalling splitter data: %v", err)
+	}
+	message := pubsub.MessagePublishedData{
+		Message: pubsub.PubSubMessage{
+			Data:       inputDataBytes,
+			Attributes: make(map[string]string),
+		},
+	}
+	// Create a CloudEvent to be sent to the Mapper
+	e := event.New()
+	e.SetDataContentType("application/json")
+	err = e.SetData(e.DataContentType(), message)
+	if err != nil {
+		t.Fatalf("Error setting event data: %v", err)
+	}
+
+	// When
+	err = Splitter(context.Background(), e)
+
+	// Then
+	assert.NotNil(t, err)
+	assert.Contains(t, err.Error(), "error reading file from bucket:")
+}
+
+func TestSplitter_CreateStorageClientError(t *testing.T) {
+	// Setup test
+	teardown, _ := test.SetupTest(t, []string{pubsub.MAPPER_TOPIC, pubsub.CONTROLLER_TOPIC})
+	defer teardown(t)
+
+	// Given
+	// Create a message
+	inputData := pubsub.SplitterData{
+		BucketName: test.INPUT_BUCKET_NAME,
+		FileName:   "test.txt",
+	}
+	inputDataBytes, err := json.Marshal(inputData)
+	if err != nil {
+		t.Fatalf("Error marshalling splitter data: %v", err)
+	}
+	message := pubsub.MessagePublishedData{
+		Message: pubsub.PubSubMessage{
+			Data:       inputDataBytes,
+			Attributes: make(map[string]string),
+		},
+	}
+	// Create a CloudEvent to be sent to the Mapper
+	e := event.New()
+	e.SetDataContentType("application/json")
+	err = e.SetData(e.DataContentType(), message)
+	if err != nil {
+		t.Fatalf("Error setting event data: %v", err)
+	}
+
+	// When
+	err = Splitter(context.Background(), e)
+
+	// Then
+	assert.NotNil(t, err)
+	assert.Contains(t, err.Error(), "error splitting file:")
+}
+
+func TestSplitter_CreatePubSubClientError(t *testing.T) {
+	// Given
+	// Create a message
+	inputData := pubsub.SplitterData{
+		BucketName: test.INPUT_BUCKET_NAME,
+		FileName:   "test.txt",
+	}
+	inputDataBytes, err := json.Marshal(inputData)
+	if err != nil {
+		t.Fatalf("Error marshalling splitter data: %v", err)
+	}
+	message := pubsub.MessagePublishedData{
+		Message: pubsub.PubSubMessage{
+			Data:       inputDataBytes,
+			Attributes: make(map[string]string),
+		},
+	}
+	// Create a CloudEvent to be sent to the Mapper
+	e := event.New()
+	e.SetDataContentType("application/json")
+	err = e.SetData(e.DataContentType(), message)
+	if err != nil {
+		t.Fatalf("Error setting event data: %v", err)
+	}
+
+	// When
+	err = Splitter(context.Background(), e)
+
+	// Then
+	assert.NotNil(t, err)
+	assert.Contains(t, err.Error(), "error creating pubsub client:")
+}
+
 func TestRemoveBookHeaderAndFooter(t *testing.T) {
 	// Given
 	inputText := []byte(`#SOME BOOK HEADER# *** START OF THIS PROJECT GUTENBERG EBOOK SOME TITLE *** The quick brown fox jumps over the lazy dog.

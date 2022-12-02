@@ -31,28 +31,28 @@ func Reducer(ctx context.Context, e event.Event) error {
 	if err != nil {
 		return err
 	}
-	// Get the reducer number and the output bucket from the attributes
-	reducerNum := attributes["reducerNum"]
+	// Get the redis number and the output bucket from the attributes
+	redisNum := attributes["redisNum"]
 	outputBucket := attributes["outputBucket"]
-	fileName := fmt.Sprintf("anagrams-part-%s.txt", reducerNum)
+	fileName := fmt.Sprintf("anagrams-part-%s.txt", redisNum)
 
 	// Read, reduce and write to a file the key-value pairs from redis
-	err = reduceAnagramsFromRedis(ctx, outputBucket, fileName, reducerNum)
+	err = reduceAnagramsFromRedis(ctx, outputBucket, fileName, redisNum)
 	if err != nil {
 		return err
 	}
 	// Remove all the data from the redis instance after it has been processed
-	res := r.MultiRedisClient[reducerNum].FlushAll(ctx)
+	res := r.MultiRedisClient[redisNum].FlushAll(ctx)
 	if res.Err() != nil {
 		log.Printf("error flushing redis: %v", err)
 	}
-	log.Printf("reducer %s took %v", reducerNum, time.Since(start))
+	log.Printf("reducer %s took %v", redisNum, time.Since(start))
 	return nil
 }
 
 // reduceAnagramsFromRedis reads the key-value pairs from redis, reduces them and writes them to a file in the output
 // bucket. It uses a mutex to prevent race conditions when writing to the file.
-func reduceAnagramsFromRedis(ctx context.Context, outputBucket, fileName, reducerNum string) error {
+func reduceAnagramsFromRedis(ctx context.Context, outputBucket, fileName, redisNum string) error {
 	// Create a new storage client to write the output file
 	storageClient, err := storage.NewWithWriter(ctx, outputBucket, fileName)
 	if err != nil {
@@ -61,7 +61,7 @@ func reduceAnagramsFromRedis(ctx context.Context, outputBucket, fileName, reduce
 	defer storageClient.Close()
 
 	// Get all the keys from the redis instance
-	keys := r.MultiRedisClient[reducerNum].Keys(ctx, "*").Val()
+	keys := r.MultiRedisClient[redisNum].Keys(ctx, "*").Val()
 
 	var wg sync.WaitGroup
 	var mu sync.Mutex
@@ -72,7 +72,7 @@ func reduceAnagramsFromRedis(ctx context.Context, outputBucket, fileName, reduce
 		go func(key string) {
 			defer wg.Done()
 			// Use LRange to get all the values in the list for the key
-			res := r.MultiRedisClient[reducerNum].LRange(ctx, key, 0, -1)
+			res := r.MultiRedisClient[redisNum].LRange(ctx, key, 0, -1)
 			if res.Err() != nil {
 				log.Printf("error getting value from redis: %v", res.Err())
 			}

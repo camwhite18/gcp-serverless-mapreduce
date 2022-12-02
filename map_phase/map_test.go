@@ -71,7 +71,7 @@ func TestMapper(t *testing.T) {
 
 func TestProcessText(t *testing.T) {
 	// Given
-	inputText := "TestString."
+	inputText := "teststring."
 	expectedResult := "teststring"
 
 	// When
@@ -83,7 +83,7 @@ func TestProcessText(t *testing.T) {
 
 func TestProcessTextNumber(t *testing.T) {
 	// Given
-	inputText := "Test1String"
+	inputText := "test1string"
 	expectedResult := ""
 
 	// When
@@ -95,7 +95,7 @@ func TestProcessTextNumber(t *testing.T) {
 
 func TestProcessTextStopWord(t *testing.T) {
 	// Given
-	inputText := "Would've"
+	inputText := "would've"
 	expectedResult := ""
 
 	// When
