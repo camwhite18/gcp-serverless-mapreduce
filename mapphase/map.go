@@ -1,4 +1,4 @@
-package map_phase
+package mapphase
 
 import (
 	"context"

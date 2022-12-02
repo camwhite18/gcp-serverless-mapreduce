@@ -1,4 +1,4 @@
-package map_phase
+package mapphase
 
 import (
 	ps "cloud.google.com/go/pubsub"

@@ -1,4 +1,4 @@
-package reduce_phase
+package reducephase
 
 import (
 	"cloud.google.com/go/storage"

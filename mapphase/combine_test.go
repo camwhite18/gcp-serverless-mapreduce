@@ -1,4 +1,4 @@
-package map_phase
+package mapphase
 
 import (
 	ps "cloud.google.com/go/pubsub"
@@ -12,16 +12,22 @@ import (
 	"time"
 )
 
-func TestMapper(t *testing.T) {
+func TestCombine(t *testing.T) {
 	// Setup test
-	teardown, subscriptions := test.SetupTest(t, []string{pubsub.COMBINE_TOPIC})
+	teardown, subscriptions := test.SetupTest(t, []string{pubsub.SHUFFLER_TOPIC})
 	defer teardown(t)
 	// Given
 	// Create a message
-	inputData := []string{"the", "quick", "brown", "fox", "quick"}
+	inputData := []pubsub.MappedWord{
+		{Anagrams: map[string]struct{}{"care": {}}, SortedWord: "acer"},
+		{Anagrams: map[string]struct{}{"part": {}}, SortedWord: "artp"},
+		{Anagrams: map[string]struct{}{"race": {}}, SortedWord: "acer"},
+		{Anagrams: map[string]struct{}{"care": {}}, SortedWord: "acer"},
+		{Anagrams: map[string]struct{}{"trap": {}}, SortedWord: "artp"},
+	}
 	inputDataBytes, err := json.Marshal(inputData)
 	if err != nil {
-		t.Fatalf("Error marshalling Mapper data: %v", err)
+		t.Fatalf("Error marshalling mapper data: %v", err)
 	}
 	message := pubsub.MessagePublishedData{
 		Message: pubsub.PubSubMessage{
@@ -29,7 +35,7 @@ func TestMapper(t *testing.T) {
 			Attributes: make(map[string]string),
 		},
 	}
-	// Create a CloudEvent to be sent to the Mapper
+	// Create a CloudEvent to be sent to the mapper
 	e := event.New()
 	e.SetDataContentType("application/json")
 	err = e.SetData(e.DataContentType(), message)
@@ -38,13 +44,12 @@ func TestMapper(t *testing.T) {
 	}
 
 	expectedResult := []pubsub.MappedWord{
-		{Anagrams: map[string]struct{}{"quick": {}}, SortedWord: "cikqu"},
-		{Anagrams: map[string]struct{}{"brown": {}}, SortedWord: "bnorw"},
-		{Anagrams: map[string]struct{}{"fox": {}}, SortedWord: "fox"},
+		{SortedWord: "acer", Anagrams: map[string]struct{}{"care": {}, "race": {}}},
+		{SortedWord: "artp", Anagrams: map[string]struct{}{"part": {}, "trap": {}}},
 	}
 
 	// When
-	err = Mapper(context.Background(), e)
+	err = Combine(context.Background(), e)
 
 	// Then
 	// Ensure there are no errors returned
@@ -62,23 +67,21 @@ func TestMapper(t *testing.T) {
 		msg.Ack()
 	})
 	// Ensure the message data matches the expected result
-	for i := 0; i < len(expectedResult); i++ {
-		assert.Contains(t, actualResult, expectedResult[i])
-	}
+	assert.Equal(t, expectedResult, actualResult)
 	// Ensure there are no errors returned by the receiver
 	assert.Nil(t, err)
 }
 
-func TestMapper_ReadPubSubMessageError(t *testing.T) {
+func TestCombine_ReadPubSubMessageError(t *testing.T) {
 	// Setup test
-	teardown, _ := test.SetupTest(t, []string{pubsub.COMBINE_TOPIC})
+	teardown, _ := test.SetupTest(t, []string{pubsub.SHUFFLER_TOPIC})
 	defer teardown(t)
 	// Given
 	// Create a message
 	inputData := []int{1, 2, 3}
 	inputDataBytes, err := json.Marshal(inputData)
 	if err != nil {
-		t.Fatalf("Error marshalling Mapper data: %v", err)
+		t.Fatalf("Error marshalling mapper data: %v", err)
 	}
 	message := pubsub.MessagePublishedData{
 		Message: pubsub.PubSubMessage{
@@ -86,7 +89,7 @@ func TestMapper_ReadPubSubMessageError(t *testing.T) {
 			Attributes: make(map[string]string),
 		},
 	}
-	// Create a CloudEvent to be sent to the Mapper
+	// Create a CloudEvent to be sent to the mapper
 	e := event.New()
 	e.SetDataContentType("application/json")
 	err = e.SetData(e.DataContentType(), message)
@@ -95,20 +98,20 @@ func TestMapper_ReadPubSubMessageError(t *testing.T) {
 	}
 
 	// When
-	err = Mapper(context.Background(), e)
+	err = Combine(context.Background(), e)
 
 	// Then
 	assert.NotNil(t, err)
 	assert.Contains(t, err.Error(), "error unmarshalling message")
 }
 
-func TestMapper_CreatePubSubClientError(t *testing.T) {
+func TestCombine_CreatePubSubClientError(t *testing.T) {
 	// Given
 	// Create a message
-	inputData := []string{"the", "quick", "brown", "fox", "quick"}
+	inputData := []int{1, 2, 3}
 	inputDataBytes, err := json.Marshal(inputData)
 	if err != nil {
-		t.Fatalf("Error marshalling Mapper data: %v", err)
+		t.Fatalf("Error marshalling mapper data: %v", err)
 	}
 	message := pubsub.MessagePublishedData{
 		Message: pubsub.PubSubMessage{
@@ -116,7 +119,7 @@ func TestMapper_CreatePubSubClientError(t *testing.T) {
 			Attributes: make(map[string]string),
 		},
 	}
-	// Create a CloudEvent to be sent to the Mapper
+	// Create a CloudEvent to be sent to the mapper
 	e := event.New()
 	e.SetDataContentType("application/json")
 	err = e.SetData(e.DataContentType(), message)
@@ -125,45 +128,9 @@ func TestMapper_CreatePubSubClientError(t *testing.T) {
 	}
 
 	// When
-	err = Mapper(context.Background(), e)
+	err = Combine(context.Background(), e)
 
 	// Then
 	assert.NotNil(t, err)
 	assert.Contains(t, err.Error(), "error creating pubsub client")
-}
-
-func TestProcessText(t *testing.T) {
-	// Given
-	inputText := "teststring."
-	expectedResult := "teststring"
-
-	// When
-	actualResult := preProcessWord(inputText)
-
-	// Then
-	assert.Equal(t, expectedResult, actualResult)
-}
-
-func TestProcessTextNumber(t *testing.T) {
-	// Given
-	inputText := "test1string"
-	expectedResult := ""
-
-	// When
-	actualResult := preProcessWord(inputText)
-
-	// Then
-	assert.Equal(t, expectedResult, actualResult)
-}
-
-func TestProcessTextStopWord(t *testing.T) {
-	// Given
-	inputText := "would've"
-	expectedResult := ""
-
-	// When
-	actualResult := preProcessWord(inputText)
-
-	// Then
-	assert.Equal(t, expectedResult, actualResult)
 }
