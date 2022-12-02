@@ -36,6 +36,7 @@ func Splitter(ctx context.Context, e event.Event) error {
 	}
 
 	// Split the text in the file into partitions for efficiency and to avoid pubsub message size limits
+	// Also split each partition into a slice of words
 	partitionedText, err := splitFile(ctx, splitterData.BucketName, splitterData.FileName)
 	if err != nil {
 		return fmt.Errorf("error splitting file: %v", err)
@@ -95,6 +96,7 @@ func removeBookHeaderAndFooter(data []byte) []byte {
 	return data
 }
 
+// removeDuplicateWords removes any duplicate words from the given slice of strings and returns the slice of strings
 func removeDuplicateWords(text []string) []string {
 	// Create a map to store the unique words
 	uniqueWords := make(map[string]struct{})
@@ -120,7 +122,7 @@ func partitionFile(splitText []string, messageSize int) [][]string {
 	for _, s := range splitText {
 		byteArray = append(byteArray, []byte(s)...)
 	}
-	// Calculate the number of partitions required and the size of each partition
+	// Calculate the number of partitions required and thus the size of each partition
 	if size := binary.Size(byteArray); size > messageSize {
 		numOfPartitions = int(math.Ceil(float64(size) / float64(messageSize)))
 		log.Printf("Size of data is %d bytes, so splitting into %d partitions", size, numOfPartitions)
@@ -139,7 +141,7 @@ func partitionFile(splitText []string, messageSize int) [][]string {
 	return partitions
 }
 
-// sendTextToMapper sends the given text to the Mapper and returns an error
+// sendTextToMapper sends the given text to the Mapper and can return an error
 func sendTextToMapper(pubsubClient pubsub.Client, attributes map[string]string,
 	partitionedText [][]string) error {
 	// We need to use a wait group to wait for all the messages to be published before returning
@@ -164,9 +166,11 @@ func sendTextToMapper(pubsubClient pubsub.Client, attributes map[string]string,
 	return nil
 }
 
+// sendIDToController sends a message to the controller topic to let it know that a partition has been published
 func sendIDToController(pubsubClient pubsub.Client, attributes map[string]string) {
 	// Create a unique id for the partition so that we can track it
 	attributes["partitionId"] = uuid.New().String()
+	// Create the data to be sent to the controller
 	statusMessage := pubsub.ControllerMessage{
 		Id:     attributes["partitionId"],
 		Status: pubsub.STATUS_STARTED,

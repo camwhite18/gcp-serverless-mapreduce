@@ -58,9 +58,9 @@ func StartMapReduce(w http.ResponseWriter, r *http.Request) {
 	}
 	defer pubsubClient.Close()
 	// Push each file name to the splitter topic
-	// Use a wait group so we can wait for all the messages to be sent before returning
 	var wg sync.WaitGroup
 	for _, file := range files {
+		// Create the data that will be sent to the splitter
 		splitterData := pubsub.SplitterData{
 			BucketName: inputBucketName,
 			FileName:   file,
@@ -72,6 +72,7 @@ func StartMapReduce(w http.ResponseWriter, r *http.Request) {
 			pubsubClient.SendPubSubMessage(pubsub.SPLITTER_TOPIC, splitterData, map[string]string{"outputBucket": outputBucketName})
 		}()
 	}
+	// Use a wait group so we can wait for all the messages to be sent before sending a response
 	wg.Wait()
 	writeResponse(w, http.StatusOK, "MapReduce started successfully - results will be stored in: "+outputBucketName)
 }

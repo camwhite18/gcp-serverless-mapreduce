@@ -12,8 +12,8 @@ import (
 )
 
 // Mapper is a function that is triggered by a message being published to the Mapper topic. It reads the split text from
-// the message, pre-processes it, creates a key-value pair of the sorted word and the word and sends the list of key-value
-// pairs to the combiner. It requires the message data to be of type []string.
+// the message, pre-processes it, creates a key-value pair of the sorted word and the original word and sends the list
+// of key-value pairs to the combiner. It requires the message data to be of type []string.
 func Mapper(ctx context.Context, e event.Event) error {
 	start := time.Now()
 	// Create a new pubsub client
@@ -57,8 +57,8 @@ func Mapper(ctx context.Context, e event.Event) error {
 	return nil
 }
 
-// mapWord maps a word to its sorted form and stores the result in mappedText. It accepts a pointer to a WaitGroup, a
-// pointer to a sync.Mutex, a pointer to a slice of MappedWord and a string. It returns nothing.
+// mapWord maps a word to its sorted form and pushed the result onto the keyValue channel. It accepts a pointer to a
+// WaitGroup, a pointer to a sync.Mutex, a pointer to a slice of MappedWord and a string. It returns nothing.
 func mapWord(wg *sync.WaitGroup, keyValueChan chan pubsub.MappedWord, word string) {
 	defer wg.Done()
 	// Do some preprocessing on the word
@@ -71,7 +71,7 @@ func mapWord(wg *sync.WaitGroup, keyValueChan chan pubsub.MappedWord, word strin
 	splitWord := strings.Split(preProcessedWord, "")
 	sort.Strings(splitWord)
 	sortedWord := strings.Join(splitWord, "")
-	// Use a map as the value in the key-value pair to avoid duplicates in later stages
+	// Use a map as the value in the key-value pair to avoid duplicates in later stages (sets don't exist in Go)
 	// Add the word to the map with an empty struct as the value to save memory
 	anagrams := map[string]struct{}{preProcessedWord: {}}
 	// Write the key-value pair to the channel
@@ -108,7 +108,7 @@ func preProcessWord(word string) string {
 	}
 	// Remove any punctuation from the start and end of the word
 	word = strings.Trim(word, ".,;:!?()'\" ")
-	// Remove the word if it is a stopword or contains numbers or symbols
+	// Remove the word if it is a stopword, or contains numbers or symbols
 	if _, ok := stopwords[word]; ok || strings.ContainsAny(word, "0123456789*+-_&^%$#@!~`|}{[]\\:;\"'<>,.?/()") {
 		return ""
 	}

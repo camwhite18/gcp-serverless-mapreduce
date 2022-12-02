@@ -13,8 +13,9 @@ import (
 )
 
 // Shuffler is a function that is triggered by a message being published to the Shuffler topic. It receives a list of
-// MappedWord objects and shuffles them into a map of reducer number to a list of MappedWord objects. It then pushes each
-// list of MappedWord objects to the appropriate reducer topic.
+// MappedWord objects and shuffles them into a map of reducer number to a list of MappedWord objects. It then writes
+// each list of MappedWord objects to the appropriate redis instance. It then sends a message to the controller topic
+// to let it know that the shuffling is complete for the partition.
 func Shuffler(ctx context.Context, e event.Event) error {
 	start := time.Now()
 	r.InitMultiRedisClient()
@@ -32,10 +33,9 @@ func Shuffler(ctx context.Context, e event.Event) error {
 		return err
 	}
 
-	// Shuffle the words into a map of reducer number to a list of MappedWord objects then add each list to the appropriate
-	// redis instance as this is much faster than adding each MappedWord object to redis individually
+	// Shuffle the words into a map of reducer number to a list of MappedWord objects
 	shuffledText := shuffle(wordData)
-	// Add each list of MappedWord objects to the appropriate reducer number
+	// Add each list of MappedWord objects to the correct redis instance
 	err = addToRedis(ctx, shuffledText)
 	if err != nil {
 		return err
@@ -61,8 +61,8 @@ func shuffle(wordData []pubsub.MappedWord) map[int][]pubsub.MappedWord {
 		go func(value pubsub.MappedWord) {
 			defer wg.Done()
 			// Get the reducer number for a given sorted word
-			reducerNum := partition(value.SortedWord)
-			// Lock the map to prevent concurrent writes
+			reducerNum := partitioner(value.SortedWord)
+			// Lock the mutex to prevent concurrent writes to the map
 			mu.Lock()
 			defer mu.Unlock()
 			// Add the MappedWord object to the appropriate reducer number
@@ -77,9 +77,9 @@ func shuffle(wordData []pubsub.MappedWord) map[int][]pubsub.MappedWord {
 	return shuffledText
 }
 
-// partition takes a word and returns the reducer number it should be sent to by taking the modulus of the
+// partitioner takes a word and returns the reducer number it should be sent to by taking the modulus of the
 // hashed word with the total number of reducers
-func partition(s string) int {
+func partitioner(s string) int {
 	// Create a new hash
 	h := fnv.New32a()
 	_, _ = h.Write([]byte(s))
@@ -88,20 +88,23 @@ func partition(s string) int {
 	return int(hashedString % uint32(r.NO_OF_REDUCER_INSTANCES))
 }
 
+// addToRedis takes a map of reducer number to a list of MappedWord objects and adds each list of MappedWord objects
+// to the appropriate redis instance
 func addToRedis(ctx context.Context, shuffledText map[int][]pubsub.MappedWord) error {
-	// Add each list of MappedWord objects to the appropriate reducer number
 	var wg sync.WaitGroup
+	// Loop through each reducer number and add the list of MappedWord objects to the appropriate redis instance
 	for reducerNum := range shuffledText {
 		wg.Add(1)
 		go func(reducerNum int) {
 			defer wg.Done()
+			// Loop through each MappedWord object and add it to the redis instance
 			for _, value := range shuffledText[reducerNum] {
-				// Add the MappedWord object to the appropriate reducer number
+				// Convert the map to a slice of interfaces
 				var anagrams []interface{}
 				for word := range value.Anagrams {
 					anagrams = append(anagrams, word)
 				}
-				// Add the word to the appropriate reducer number
+				// Push the anagrams into the list for the sorted word in the redis instance
 				res := r.MultiRedisClient[strconv.Itoa(reducerNum)].LPush(ctx, value.SortedWord, anagrams...)
 				if res.Err() != nil {
 					log.Println(res.Err())
@@ -109,7 +112,7 @@ func addToRedis(ctx context.Context, shuffledText map[int][]pubsub.MappedWord) e
 			}
 		}(reducerNum)
 	}
-	// Wait for all the words to be added to redis
+	// Wait for all the words to be added to each redis instance
 	wg.Wait()
 	return nil
 }
