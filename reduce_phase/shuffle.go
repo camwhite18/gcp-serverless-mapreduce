@@ -1,4 +1,4 @@
-package shuffle_phase
+package reduce_phase
 
 import (
 	"context"

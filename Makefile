@@ -81,10 +81,10 @@ remove-combine:
 	./map_phase/delete-combine.sh
 
 deploy-shuffler:
-	./shuffle_phase/deploy-shuffler.sh
+	./reduce_phase/deploy-shuffler.sh
 
 remove-shuffler:
-	./shuffle_phase/delete-shuffler.sh
+	./reduce_phase/delete-shuffler.sh
 
 deploy-reducer:
 	./reduce_phase/deploy-reducers.sh

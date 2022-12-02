@@ -5,7 +5,6 @@ import (
 	"gitlab.com/cameron_w20/serverless-mapreduce/controller"
 	"gitlab.com/cameron_w20/serverless-mapreduce/map_phase"
 	"gitlab.com/cameron_w20/serverless-mapreduce/reduce_phase"
-	"gitlab.com/cameron_w20/serverless-mapreduce/shuffle_phase"
 )
 
 func init() {
@@ -15,6 +14,6 @@ func init() {
 	functions.CloudEvent("Splitter", map_phase.Splitter)
 	functions.CloudEvent("Mapper", map_phase.Mapper)
 	functions.CloudEvent("Combiner", map_phase.Combine)
-	functions.CloudEvent("Shuffler", shuffle_phase.Shuffler)
+	functions.CloudEvent("Shuffler", reduce_phase.Shuffler)
 	functions.CloudEvent("Reducer", reduce_phase.Reducer)
 }
