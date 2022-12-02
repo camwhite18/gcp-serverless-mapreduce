@@ -31,12 +31,12 @@ func Reducer(ctx context.Context, e event.Event) error {
 	if err != nil {
 		return err
 	}
+	// Get the reducer number and the output bucket from the attributes
 	reducerNum := attributes["reducerNum"]
-	log.Printf("Starting reducer %s", reducerNum)
 	outputBucket := attributes["outputBucket"]
 	fileName := fmt.Sprintf("anagrams-part-%s.txt", reducerNum)
 
-	// Read and process the key-value pairs from redis
+	// Read, reduce and write to a file the key-value pairs from redis
 	err = reduceAnagramsFromRedis(ctx, outputBucket, fileName, reducerNum)
 	if err != nil {
 		return err
@@ -50,6 +50,8 @@ func Reducer(ctx context.Context, e event.Event) error {
 	return nil
 }
 
+// reduceAnagramsFromRedis reads the key-value pairs from redis, reduces them and writes them to a file in the output
+// bucket. It uses a mutex to prevent race conditions when writing to the file.
 func reduceAnagramsFromRedis(ctx context.Context, outputBucket, fileName, reducerNum string) error {
 	// Create a new storage client to write the output file
 	storageClient, err := storage.NewWithWriter(ctx, outputBucket, fileName)
@@ -57,11 +59,14 @@ func reduceAnagramsFromRedis(ctx context.Context, outputBucket, fileName, reduce
 		return err
 	}
 	defer storageClient.Close()
+
 	// Get all the keys from the redis instance
 	keys := r.MultiRedisClient[reducerNum].Keys(ctx, "*").Val()
+
 	var wg sync.WaitGroup
 	var mu sync.Mutex
-	// Loop through each key and get the values
+	// Loop through each key and reduce the list of anagrams for that key and write it to the file in the output bucket
+	// concurrently
 	for _, key := range keys {
 		wg.Add(1)
 		go func(key string) {
@@ -84,10 +89,12 @@ func reduceAnagramsFromRedis(ctx context.Context, outputBucket, fileName, reduce
 			}
 		}(key)
 	}
+	// Wait until all the key, list of anagrams pairs have been processed
 	wg.Wait()
 	return nil
 }
 
+// reduceAnagrams removes any duplicate anagrams from the slice
 func reduceAnagrams(values []string) []string {
 	var reducedAnagrams []string
 	// Create a map to ignore duplicate anagrams
