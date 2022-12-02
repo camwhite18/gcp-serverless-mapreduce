@@ -70,6 +70,7 @@ func SetupTest(tb testing.TB, topicIDs []string) (func(tb testing.TB), []*pubsub
 func CreateTestStorage(tb testing.TB) func(tb testing.TB) {
 	// Setup test
 	createStorageCtx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
 	// Modify the STORAGE_EMULATOR_HOST environment variable to point to the storage emulator
 	existingStorageVal := os.Getenv("STORAGE_EMULATOR_HOST")
 	err := os.Setenv("STORAGE_EMULATOR_HOST", "localhost:9023")
@@ -83,8 +84,6 @@ func CreateTestStorage(tb testing.TB) func(tb testing.TB) {
 	}
 	// Create the input bucket
 	inputBucket := client.Bucket(INPUT_BUCKET_NAME)
-
-	defer cancel()
 	if err := inputBucket.Create(createStorageCtx, "serverless-mapreduce", nil); err != nil &&
 		!strings.Contains(err.Error(), "already own this bucket") {
 		tb.Fatalf("Error creating inputBucket: %v", err)
@@ -111,16 +110,26 @@ func CreateTestStorage(tb testing.TB) func(tb testing.TB) {
 		// Teardown test
 		deleteStorageCtx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 		defer cancel()
-		// Delete the file in the bucket
-		if err := object.Delete(deleteStorageCtx); err != nil {
-			tb.Fatalf("Error deleting object: %v", err)
+		// Delete the files in the input bucket
+		it := inputBucket.Objects(deleteStorageCtx, nil)
+		for {
+			attrs, err := it.Next()
+			if err == iterator.Done {
+				break
+			}
+			if err != nil {
+				tb.Fatalf("Error listing output bucket: %v", err)
+			}
+			if err := inputBucket.Object(attrs.Name).Delete(deleteStorageCtx); err != nil {
+				tb.Fatalf("Error deleting object: %v", err)
+			}
 		}
 		// Delete the input bucket
 		if err := inputBucket.Delete(deleteStorageCtx); err != nil {
 			tb.Fatalf("Error deleting input bucket: %v", err)
 		}
 		// Delete the files in the output bucket
-		it := outputBucket.Objects(deleteStorageCtx, nil)
+		it = outputBucket.Objects(deleteStorageCtx, nil)
 		for {
 			attrs, err := it.Next()
 			if err == iterator.Done {

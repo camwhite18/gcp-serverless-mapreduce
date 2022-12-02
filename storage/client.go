@@ -82,7 +82,7 @@ func (c *clientImpl) ReadObject(ctx context.Context, bucketName, objectName stri
 	// Create a reader for the file
 	rc, err := c.client.Bucket(bucketName).Object(objectName).NewReader(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error creating reader for object %s: %v", objectName, err)
 	}
 	defer rc.Close()
 	// Read the contents of the file

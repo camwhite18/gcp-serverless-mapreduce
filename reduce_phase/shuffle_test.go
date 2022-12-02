@@ -58,8 +58,10 @@ func TestShuffler(t *testing.T) {
 	}
 	assert.Contains(t, result1, "care")
 	assert.Contains(t, result1, "race")
+	assert.Len(t, result1, 2)
 	assert.Contains(t, result2, "part")
 	assert.Contains(t, result2, "trap")
+	assert.Len(t, result2, 2)
 }
 
 func TestShuffler_ReadPubSubMessageError(t *testing.T) {

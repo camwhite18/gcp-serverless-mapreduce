@@ -9,7 +9,10 @@ declare -A SPECIFIC_THRESHOLDS
 # unit test thresholds
 SPECIFIC_THRESHOLDS[gitlab.com/cameron_w20/serverless-mapreduce]=0
 SPECIFIC_THRESHOLDS[gitlab.com/cameron_w20/serverless-mapreduce/test]=0
+SPECIFIC_THRESHOLDS[gitlab.com/cameron_w20/serverless-mapreduce/redis]=0
 SPECIFIC_THRESHOLDS[gitlab.com/cameron_w20/serverless-mapreduce/controller]=88
+SPECIFIC_THRESHOLDS[gitlab.com/cameron_w20/serverless-mapreduce/storage]=60
+SPECIFIC_THRESHOLDS[gitlab.com/cameron_w20/serverless-mapreduce/pubsub]=76
 
 go clean -testcache
 
