@@ -111,6 +111,36 @@ func TestMapReduceController_StatusFinished(t *testing.T) {
 	assert.Equal(t, int64(0), cardinality)
 }
 
+func TestMapReduceController_ReadPubSubMessageError(t *testing.T) {
+	// Given
+	teardown, _ := test.SetupTest(t, []string{pubsub.REDUCER_TOPIC})
+	defer teardown(t)
+	statusMessageBytes, err := json.Marshal([]int{1, 2, 3})
+	if err != nil {
+		t.Fatalf("Error marshalling status message: %v", err)
+	}
+	message := pubsub.MessagePublishedData{
+		Message: pubsub.PubSubMessage{
+			Data: statusMessageBytes,
+		},
+	}
+
+	// Create a CloudEvent to be sent to the shuffler
+	e := event.New()
+	e.SetDataContentType("application/json")
+	err = e.SetData(e.DataContentType(), message)
+	if err != nil {
+		t.Fatalf("Error setting event data: %v", err)
+	}
+
+	// When
+	err = Controller(context.Background(), e)
+
+	// Then
+	assert.NotNil(t, err)
+	assert.Contains(t, err.Error(), "error reading pubsub message")
+}
+
 func TestMapReduceController_CreatePubSubClientError(t *testing.T) {
 	// Given
 	teardownRedis := test.SetupRedisTest(t)
