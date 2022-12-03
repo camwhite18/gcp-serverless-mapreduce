@@ -1,8 +1,3 @@
-INPUT_BUCKET_NAME=serverless-mapreduce-input
-OUTPUT_BUCKET_NAME=serverless-mapreduce-output
-GCP_REGION=europe-west2
-GCP_PROJECT=serverless-mapreduce
-
 setup-test: create-pubsub-emulator create-local-redis create-storage-emulator
 
 teardown-test: remove-pubsub-emulator remove-local-redis remove-storage-emulator
@@ -14,35 +9,6 @@ test-coverage:
 	./scripts/coverage-report.sh
 
 test: setup-test test-unit test-coverage teardown-test
-
-create-input-bucket:
-	@gsutil mb -l $(GCP_REGION) gs://$(INPUT_BUCKET_NAME)
-
-upload-books:
-	@gsutil -m cp -r coc105-gutenburg-5000books gs://$(INPUT_BUCKET_NAME)
-
-create-output-bucket:
-	@gsutil mb -l $(GCP_REGION) gs://$(OUTPUT_BUCKET_NAME)
-
-create-api-gateway:
-	@gcloud api-gateway api-configs create mapreduce-api \
-		--api=mapreduce-api \
-		--openapi-spec=openapi.yaml \
-		--project=$(GCP_PROJECT) \
-		--backend-auth-service-account=mapreduce-api@$(GCP_PROJECT).iam.gserviceaccount.com
-	@gcloud api-gateway gateways create mapreduce-gateway \
-		--api=mapreduce-api \
-		--api-config=mapreduce-api \
-		--location=$(GCP_REGION) \
-		--project=$(GCP_PROJECT)
-
-remove-api-gateway:
-	@gcloud api-gateway gateways delete mapreduce-gateway \
-		--location=$(GCP_REGION) \
-		--project=$(GCP_PROJECT)
-	@gcloud api-gateway api-configs delete mapreduce-api \
-		--api=mapreduce-api \
-		--project=$(GCP_PROJECT)
 
 create-redis:
 	./scripts/create-redis.sh
@@ -109,6 +75,9 @@ remove: remove-redis \
 		remove-combiner \
 		remove-shuffler \
 		remove-reducer \
+
+start:
+	./scripts/start-anagram-mapreduce.sh
 
 create-pubsub-emulator:
 	@docker-compose up -d pubsub-emulator
