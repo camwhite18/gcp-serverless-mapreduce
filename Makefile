@@ -1,11 +1,6 @@
-INPUT_BUCKET_NAME=serverless-mapreduce-input
-OUTPUT_BUCKET_NAME=serverless-mapreduce-output
-GCP_REGION=europe-west2
-GCP_PROJECT=serverless-mapreduce
+setup-test: create-pubsub-emulator create-local-redis create-storage-emulator
 
-setup-test: create-pubsub-emulator create-storage-emulator create-local-redis
-
-teardown-test: remove-pubsub-emulator remove-storage-emulator remove-local-redis
+teardown-test: remove-pubsub-emulator remove-local-redis remove-storage-emulator
 
 test-unit:
 	./scripts/test-unit.sh
@@ -15,34 +10,11 @@ test-coverage:
 
 test: setup-test test-unit test-coverage teardown-test
 
-create-input-bucket:
-	@gsutil mb -l $(GCP_REGION) gs://$(INPUT_BUCKET_NAME)
+create-redis:
+	./scripts/create-redis.sh
 
-upload-books:
-	@gsutil -m cp -r coc105-gutenburg-5000books gs://$(INPUT_BUCKET_NAME)
-
-create-output-bucket:
-	@gsutil mb -l $(GCP_REGION) gs://$(OUTPUT_BUCKET_NAME)
-
-create-api-gateway:
-	@gcloud api-gateway api-configs create mapreduce-api \
-		--api=mapreduce-api \
-		--openapi-spec=openapi.yaml \
-		--project=$(GCP_PROJECT) \
-		--backend-auth-service-account=mapreduce-api@$(GCP_PROJECT).iam.gserviceaccount.com
-	@gcloud api-gateway gateways create mapreduce-gateway \
-		--api=mapreduce-api \
-		--api-config=mapreduce-api \
-		--location=$(GCP_REGION) \
-		--project=$(GCP_PROJECT)
-
-remove-api-gateway:
-	@gcloud api-gateway gateways delete mapreduce-gateway \
-		--location=$(GCP_REGION) \
-		--project=$(GCP_PROJECT)
-	@gcloud api-gateway api-configs delete mapreduce-api \
-		--api=mapreduce-api \
-		--project=$(GCP_PROJECT)
+remove-redis:
+	./scripts/delete-redis.sh
 
 deploy-controller:
 	./controller/deploy-controller.sh
@@ -50,65 +22,62 @@ deploy-controller:
 remove-controller:
 	./controller/delete-controller.sh
 
-deploy-init-mapreduce:
-	./service/deploy-init-mapreduce.sh
+deploy-starter:
+	./mapphase/deploy-starter.sh
 
-remove-init-mapreduce:
-	./service/delete-init-mapreduce.sh
+remove-starter:
+	./mapphase/delete-starter.sh
 
 deploy-splitter:
-	./map_phase/deploy-splitter.sh
+	./mapphase/deploy-splitter.sh
 
 remove-splitter:
-	./map_phase/delete-splitter.sh
+	./mapphase/delete-splitter.sh
 
 deploy-mapper:
-	./map_phase/deploy-mapper.sh
+	./mapphase/deploy-mapper.sh
 
 remove-mapper:
-	./map_phase/delete-mapper.sh
+	./mapphase/delete-mapper.sh
 
-deploy-combine:
-	./shuffle_phase/deploy-combine.sh
+deploy-combiner:
+	./mapphase/deploy-combiner.sh
 
-remove-combine:
-	./shuffle_phase/delete-combine.sh
+remove-combiner:
+	./mapphase/delete-combiner.sh
 
 deploy-shuffler:
-	./shuffle_phase/deploy-shuffler.sh
+	./reducephase/deploy-shuffler.sh
 
 remove-shuffler:
-	./shuffle_phase/delete-shuffler.sh
+	./reducephase/delete-shuffler.sh
 
 deploy-reducer:
-	./reduce_phase/deploy-reducers.sh
+	./reducephase/deploy-reducer.sh
 
 remove-reducer:
-	./reduce_phase/delete-reducers.sh
+	./reducephase/delete-reducer.sh
 
-deploy-outputter:
-	./reduce_phase/deploy-outputters.sh
-
-remove-outputter:
-	./reduce_phase/delete-outputters.sh
-
-deploy: deploy-controller \
-		deploy-init-mapreduce \
+deploy: create-redis \
+		deploy-controller \
+		deploy-starter \
 		deploy-splitter \
 		deploy-mapper \
-		deploy-combine \
+		deploy-combiner \
 		deploy-shuffler \
 		deploy-reducer \
-		deploy-outputter
 
-remove: remove-controller \
-		remove-init-mapreduce \
+remove: remove-redis \
+		remove-controller \
+		remove-starter \
 		remove-splitter \
 		remove-mapper \
-		remove-combine \
+		remove-combiner \
 		remove-shuffler \
 		remove-reducer \
-		remove-outputter
+
+start:
+	./scripts/start-anagram-mapreduce.sh
 
 create-pubsub-emulator:
 	@docker-compose up -d pubsub-emulator
@@ -120,7 +89,7 @@ create-storage-emulator:
 	@docker-compose run -dp 9023:9023 storage-emulator
 
 remove-storage-emulator:
-	@docker-compose rm -s storage-emulator
+	@docker rm --force $$(docker ps | grep -FEo -- "[a-z0-9]+-[a-z0-9_]+storage-emulator[a-z0-9_]+")
 
 create-local-redis:
 	@docker-compose up -d redis

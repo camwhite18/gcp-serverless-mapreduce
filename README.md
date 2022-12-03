@@ -1,7 +1,29 @@
 # Serverless MapReduce to find Anagrams in a dataset
 
+### Contents
+
+- [Introduction](#introduction)
+- [Prerequisites](#prerequisites)
+- [Deployment](#deployment)
+- [Running the Anagram MapReduce](#running-the-anagram-mapreduce)
+  - [Option 1](#option-1)
+  - [Option 2](#option-2)
+  - [Results](#results)
+- [Tests](#tests)
+- [22COC105 Output](#22coc105-output)
+
 ### Introduction
 
+This project is a Serverless MapReduce implementation to find anagrams in a set of Project Gutenberg books in the format
+of text files. The project is written in Go and uses GCP Cloud Functions, Cloud Pub/Sub, Cloud Storage and Cloud Memorystore 
+for Redis. The project was written for the 22COC105 Cloud Computing coursework.
+
+The project is split into 2 main parts as the MapReduce programming model follows. The first is the map phase, in which the
+data is split, preprocessed, mapped to a key-value pair and combined at a per book level (mini-reduce). The second is the 
+reduce phase, in which the key-value pairs are shuffled into redis instances based on a hash of the key, and then reduced
+together to find the anagrams.
+
+The whole process takes about 20 seconds to run on 100 books, which is about 43MB of data.
 
 ### Prerequisites
 
@@ -10,61 +32,69 @@ instructions [here](https://cloud.google.com/sdk/docs/quickstarts).
 - You need to have a GCP project with billing enabled. You can find the instructions 
 [here](https://cloud.google.com/billing/docs/how-to/modify-project).
 - In order to run the tests, you need to have Go version 1.16 installed. You can find the instructions
-[here](https://golang.org/doc/install).
+[here](https://golang.org/doc/install). You will also need to have Docker installed. You can find the instructions
+[here](https://docs.docker.com/get-docker/).
+- Run `chmod +x ./*/*.sh` in the project root to make the scripts executable.
 
 ### Deployment
 
-Deploying the functions is extremely easy due to the Bash scripts provided in each directory. To run these scripts, Make
-commands are provided. You can find the Makefile in the root directory of the project. The commands are:
+The first step is to create a `.env` file and set the `GCP_PROJECT` variable to the name of the GCP project you wish to deploy 
+everything to, and the `GCP_REGION` variable to the region you wish to deploy to (you can find the list of available regions
+[here](https://cloud.google.com/compute/docs/regions-zones)). An example file `.env.example` is provided in the root of the
+project. You can copy it to `.env` and modify it to your needs using `cp .env.example .env`.
+
+Deploying the functions and Redis instances is extremely easy due to the Bash scripts provided in each directory. To run 
+these scripts, Make commands are provided. You can find the Makefile in the root directory of the project. The commands 
+are:
 
 ```bash
-# Deploy all the functions
+# Deploy all the functions and Redis instances
 make deploy
 
 # OR individually
 
+# Deploy the Redis instances
+make deploy-redis
 # Deploy the controller function
 make deploy-controller
 # Deploy the starter function
-make deploy-init-mapreduce
+make deploy-starter
 # Deploy the splitter function
 make deploy-splitter
 # Deploy the mapper function
 make deploy-mapper
-# Deploy the combine function
-make deploy-combine
+# Deploy the combiner function
+make deploy-combiner
 # Deploy the shuffler function
 make deploy-shuffler
 # Deploy the reducer function
 make deploy-reducer
-# Deploy the outputter function
-make deploy-outputter
 ```
 
-Similarly, you can delete the functions using the following commands:
+Similarly, you can delete the functions and Redis instances using the following commands:
 
 ```bash
-# Delete all the functions
+# Delete all the functions and redis instances
 make remove
 
 # OR individually
 
+# Delete the Redis instances
+make remove-redis
 # Delete the controller function
 make remove-controller
 # Delete the starter function
-make remove-init-mapreduce
+make remove-starter
 # Delete the splitter function
 make remove-splitter
 # Delete the mapper function
 make remove-mapper
-# Delete the combine function
-make remove-combine
+# Delete the combiner function
+make remove-combiner
 # Delete the shuffler function
 make remove-shuffler
 # Delete the reducer function
 make remove-reducer
-# Delete the outputter function
-make remove-outputter
 ```
 
 **Note:** The deployment scripts are written in Bash and were tested on Linux and macOS. They may not work on Windows.
@@ -72,13 +102,67 @@ make remove-outputter
 **Warning:** The deployment scripts create several services in GCP that you will be charged monthly for - namely Redis 
 instances and a serverless VPC connector. Make sure you delete these after you are done running the project.
 
-### Starting the MapReduce
+### Running the Anagram Mapreduce
 
 To start the MapReduce running on a dataset, you need to ensure that the data is in a Google Cloud Storage bucket. 
 
-[//]: # (TODO: Add instructions on how to start the MapReduce once API gateway is implemented)
+There are two ways of starting the MapReduce:
+
+#### Option 1
+Using the Make command which will run the script `./scripts/start-anagram-mapreduce.sh` that asks you to provide the
+names of the input and output buckets. This is the easiest way to start the MapReduce.
+```bash
+make start
+```
+#### Option 2
+Find out the uri you need to call the starter function with using the command (replace $GCP_REGION and $GCP_PROJECT with
+the region and project you deployed to):
+```bash
+gcloud functions describe starter --region=$GCP_REGION --project=$GCP_PROJECT --format="value(serviceConfig.uri)"
+```
+Then, you can call the starter function using the following command (replace $URI, $INPUT_BUCKET and $OUTPUT_BUCKET with the
+values you know):
+```bash
+curl -X GET "$URI?input_bucket=$INPUT_BUCKET&output_bucket=$OUTPUT_BUCKET" | jq
+```
+
+#### Results
+Upon the successful starting of the MapReduce, you will receive a similar response:
+```json
+{
+  "responseCode": 200,
+  "message": "MapReduce started successfully - results will be stored in: serverless-mapreduce-output"
+}
+```
+In order to check whether the mapreduce has finished, you can use the following command (where $OUTPUT_BUCKET is the name of
+the bucket you provided as the output bucket):
+```bash
+gsutil ls gs://$OUTPUT_BUCKET | grep -E "anagrams-part-[0-9]+.txt"
+```
+Given that this project runs with 5 reducers, you should see 5 files in the output bucket. If you see less than 5 files, it
+means that the reduce phase is still running.
+
+To retrieve the files, you can use the following command (where $OUTPUT_BUCKET is the name of the bucket you provided as the
+output bucket):
+```bash
+gsutil -m cp -R gs://$OUTPUT_BUCKET .
+```
+
+In each file, each line is in the format of `sorted_word: word1 word2 word3 ... wordN`, where {word1, word2, word3, ..., 
+wordN} is a set of sorted anagrams. For example:`aet: ate eat tea`.
 
 ### Tests
+
+Unit tests exist that allow you to test the full functionality of each cloud function. All of these tests, including the 
+creation and removal of the Docker containers used in them, can be run using the command:
+```bash
+make test
+```
+
+**Note:** Sometimes the splitter tests can fail due to the fact that the storage emulator is not ready when the tests are, 
+and the tests fail. If this happens, just remove the containers using `make teardown-test` and run the tests again.
+
+For more information on the tests, see below
 
 Before running any tests, you will need to run several Docker images that mock GCP cloud services used in the project.
 This includes an official image by Google `gcr.io/google.com/cloudsdktool/cloud-sdk:latest` which I use to mock the 
@@ -86,9 +170,7 @@ PubSub service, and a open-source image `oittaa/gcp-storage-emulator` found
 [here](https://hub.docker.com/r/oittaa/gcp-storage-emulator) to mock Storage Buckets. I also use the official Redis 
 image `redis-stack:latest` to create a local Redis instance running in a Docker container.
 
-In order to run these, you will need to have Docker installed on your machine. You can find instructions on how to do
-this [here](https://docs.docker.com/get-docker/). Once you have Docker installed, you can run the following command to 
-create the containers:
+If you have Docker installed, you can run the following command to create the containers:
 
 ```bash
 make setup-test
@@ -130,12 +212,7 @@ version of bash that allows `declare -A`, I installed it using Homebrew). This c
 make test-coverage
 ```
 
-**All of these tests, including the creation and removal of the Docker containers, can be run using the command:**
-```bash
-make test
-```
-
-### Sample Output
+### 22COC105 Output
 
 A bucket exists in GCP that contains the output files containing all the anagrams from the 100 books as required by the 
 22COC105 coursework. The bucket is accessible from the internet read-only. Therefore, in order to download these files, 
