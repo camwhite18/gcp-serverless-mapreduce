@@ -23,7 +23,7 @@ golint:
 staticcheck:
   stage: test
   script:
-    - go install honnef.co/go/tools/cmd/staticcheck@v0.3.0
+    - go install honnef.co/go/tools/cmd/staticcheck@v0.2.2
     - staticcheck ./...
 
 unit-test:
