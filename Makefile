@@ -3,9 +3,9 @@ OUTPUT_BUCKET_NAME=serverless-mapreduce-output
 GCP_REGION=europe-west2
 GCP_PROJECT=serverless-mapreduce
 
-setup-test: create-pubsub-emulator create-storage-emulator create-local-redis
+setup-test: create-pubsub-emulator create-local-redis create-storage-emulator
 
-teardown-test: remove-pubsub-emulator remove-storage-emulator remove-local-redis
+teardown-test: remove-pubsub-emulator remove-local-redis remove-storage-emulator
 
 test-unit:
 	./scripts/test-unit.sh
@@ -87,10 +87,10 @@ remove-shuffler:
 	./reducephase/delete-shuffler.sh
 
 deploy-reducer:
-	./reducephase/deploy-reducers.sh
+	./reducephase/deploy-reducer.sh
 
 remove-reducer:
-	./reducephase/delete-reducers.sh
+	./reducephase/delete-reducer.sh
 
 deploy: create-redis \
 		deploy-controller \
@@ -120,7 +120,7 @@ create-storage-emulator:
 	@docker-compose run -dp 9023:9023 storage-emulator
 
 remove-storage-emulator:
-	@docker-compose rm -s storage-emulator
+	@docker rm --force $$(docker ps | grep -FEo -- "[a-z0-9]+-[a-z0-9_]+storage-emulator[a-z0-9_]+")
 
 create-local-redis:
 	@docker-compose up -d redis

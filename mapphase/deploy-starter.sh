@@ -18,7 +18,8 @@ if (gcloud functions deploy starter \
     --entry-point Starter \
     --region="$GCP_REGION" \
     --memory=512MB \
-    --project="$GCP_PROJECT") ; then
+    --project="$GCP_PROJECT" \
+    --set-env-vars=GCP_PROJECT="$GCP_PROJECT") ; then
   echo "Successfully deployed starter"
 else
   echo "Failed to deploy starter"

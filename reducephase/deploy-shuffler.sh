@@ -41,7 +41,7 @@ if (gcloud functions deploy shuffler \
     --memory=512MB \
     --project="$GCP_PROJECT" \
     --vpc-connector=projects/"$GCP_PROJECT"/locations/"$GCP_REGION"/connectors/mapreduce-connector \
-    --set-env-vars=REDIS_HOSTS="$REDIS_HOSTS"
+    --set-env-vars=REDIS_HOSTS="$REDIS_HOSTS",GCP_PROJECT="$GCP_PROJECT"
     ) ; then
   echo "Successfully deployed shuffler"
 else

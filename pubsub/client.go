@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/cloudevents/sdk-go/v2/event"
 	"log"
+	"os"
 )
 
 // Client is an interface for interacting with pubsub.
@@ -27,7 +28,7 @@ var _ Client = &clientImpl{}
 // New returns a new pubsub client.
 func New(ctx context.Context, e event.Event) (Client, error) {
 	// Create a pubsub client
-	client, err := pubsub.NewClient(ctx, "serverless-mapreduce")
+	client, err := pubsub.NewClient(ctx, os.Getenv("GCP_PROJECT"))
 	if err != nil {
 		return nil, fmt.Errorf("error creating pubsub client: %v", err)
 	}
