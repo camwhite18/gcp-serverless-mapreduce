@@ -86,6 +86,14 @@ func removeBookHeaderAndFooter(data []byte) []byte {
 		data = data[index[1]+1:]
 	}
 	// Create a regex to match the footer
+	// There are two different types of footer so we need to match both
+	re = regexp.MustCompile(`End of[ th(e|is)]* Project Gutenberg`)
+	index = re.FindStringIndex(string(data))
+	if index != nil {
+		data = data[:index[0]]
+		return data
+	}
+	// Match the second type of footer
 	re = regexp.MustCompile(`\*\*\*.*END OF TH(E|IS) PROJECT GUTENBERG EBOOK.*\*\*\*`)
 	// Find the index of the occurrence of the footer
 	index = re.FindStringIndex(string(data))
