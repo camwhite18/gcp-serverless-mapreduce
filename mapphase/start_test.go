@@ -17,19 +17,19 @@ import (
 )
 
 func TestStartMapReduce(t *testing.T) {
-	teardown, subscriptions := test.SetupTest(t, []string{"mapreduce-splitter"})
+	teardown, subscriptions := test.SetupPubSubTest(t, []string{"mapreduce-splitter"})
 	defer teardown(t)
-	teardownTestStorage := test.CreateTestStorage(t)
+	teardownTestStorage := test.SetupStorageTest(t)
 	defer teardownTestStorage(t)
 
 	// Given
 	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("https://someurl.com?input-bucket=%s&output-bucket=%s",
-		test.INPUT_BUCKET_NAME, test.OUTPUT_BUCKET_NAME), nil)
+		test.InputBucketName, test.OutputBucketName), nil)
 	rec := httptest.NewRecorder()
 
 	expectedResponse := `{"responseCode":200,"message":"MapReduce started successfully - results will be stored in: test-bucket-output"}`
 	expectedResult := pubsub.SplitterData{
-		BucketName: test.INPUT_BUCKET_NAME,
+		BucketName: test.InputBucketName,
 		FileName:   "test.txt",
 	}
 
@@ -57,12 +57,12 @@ func TestStartMapReduce(t *testing.T) {
 }
 
 func TestStartMapReduce_CreatePubSubClientError(t *testing.T) {
-	teardownTestStorage := test.CreateTestStorage(t)
+	teardownTestStorage := test.SetupStorageTest(t)
 	defer teardownTestStorage(t)
 
 	// Given
 	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("https://someurl.com?input-bucket=%s&output-bucket=%s",
-		test.INPUT_BUCKET_NAME, test.OUTPUT_BUCKET_NAME), nil)
+		test.InputBucketName, test.OutputBucketName), nil)
 	rec := httptest.NewRecorder()
 
 	expectedResponse := `{"responseCode":500,"message":"`
@@ -76,15 +76,15 @@ func TestStartMapReduce_CreatePubSubClientError(t *testing.T) {
 }
 
 func TestStartMapReduce_EmptyInputBucketError(t *testing.T) {
-	teardown, _ := test.SetupTest(t, []string{"mapreduce-splitter"})
+	teardown, _ := test.SetupPubSubTest(t, []string{"mapreduce-splitter"})
 	defer teardown(t)
-	teardownTestStorage := test.CreateTestStorage(t)
+	teardownTestStorage := test.SetupStorageTest(t)
 	defer teardownTestStorage(t)
 
 	// Given
 	bucketName := "some-empty-bucket"
 	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("https://someurl.com?input-bucket=%s&output-bucket=%s",
-		bucketName, test.OUTPUT_BUCKET_NAME), nil)
+		bucketName, test.OutputBucketName), nil)
 	rec := httptest.NewRecorder()
 
 	expectedResponse := `{"responseCode":400,"message":"No files found in input bucket: some-empty-bucket"}`
@@ -112,12 +112,12 @@ func TestStartMapReduce_EmptyInputBucketError(t *testing.T) {
 }
 
 func TestStartMapReduce_StorageClientCreateError(t *testing.T) {
-	teardown, _ := test.SetupTest(t, []string{"mapreduce-splitter"})
+	teardown, _ := test.SetupPubSubTest(t, []string{"mapreduce-splitter"})
 	defer teardown(t)
 
 	// Given
 	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("https://someurl.com?input-bucket=%s&output-bucket=%s",
-		test.INPUT_BUCKET_NAME, test.OUTPUT_BUCKET_NAME), nil)
+		test.InputBucketName, test.OutputBucketName), nil)
 	rec := httptest.NewRecorder()
 
 	expectedResponse := `{"responseCode":500,"message":"`
@@ -131,15 +131,15 @@ func TestStartMapReduce_StorageClientCreateError(t *testing.T) {
 }
 
 func TestStartMapReduce_InvalidInputBucketError(t *testing.T) {
-	teardown, _ := test.SetupTest(t, []string{"mapreduce-splitter"})
+	teardown, _ := test.SetupPubSubTest(t, []string{"mapreduce-splitter"})
 	defer teardown(t)
-	teardownTestStorage := test.CreateTestStorage(t)
+	teardownTestStorage := test.SetupStorageTest(t)
 	defer teardownTestStorage(t)
 
 	// Given
 	bucketName := "some-invalid-bucket"
 	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("https://someurl.com?input-bucket=%s&output-bucket=%s",
-		bucketName, test.OUTPUT_BUCKET_NAME), nil)
+		bucketName, test.OutputBucketName), nil)
 	rec := httptest.NewRecorder()
 
 	expectedResponse := `{"responseCode":400,"message":"Storage bucket doesn't exist or isn't accessible"}`
@@ -153,12 +153,12 @@ func TestStartMapReduce_InvalidInputBucketError(t *testing.T) {
 }
 
 func TestStartMapReduce_NoOutputBucketProvidedError(t *testing.T) {
-	teardown, _ := test.SetupTest(t, []string{"mapreduce-splitter"})
+	teardown, _ := test.SetupPubSubTest(t, []string{"mapreduce-splitter"})
 	defer teardown(t)
 
 	// Given
 	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("https://someurl.com?input-bucket=%s",
-		test.INPUT_BUCKET_NAME), nil)
+		test.InputBucketName), nil)
 	rec := httptest.NewRecorder()
 
 	expectedResponse := `{"responseCode":400,"message":"No output bucket name provided, please provide one using the query parameter 'output-bucket'"}`
@@ -172,7 +172,7 @@ func TestStartMapReduce_NoOutputBucketProvidedError(t *testing.T) {
 }
 
 func TestStartMapReduce_NoInputBucketProvidedError(t *testing.T) {
-	teardown, _ := test.SetupTest(t, []string{"mapreduce-splitter"})
+	teardown, _ := test.SetupPubSubTest(t, []string{"mapreduce-splitter"})
 	defer teardown(t)
 
 	// Given

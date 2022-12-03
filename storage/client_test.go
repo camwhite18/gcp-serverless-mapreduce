@@ -10,7 +10,7 @@ import (
 
 func TestReadObjectNames(t *testing.T) {
 	// Setup test
-	teardownStorage := test.CreateTestStorage(t)
+	teardownStorage := test.SetupStorageTest(t)
 	defer teardownStorage(t)
 
 	// Given
@@ -21,7 +21,7 @@ func TestReadObjectNames(t *testing.T) {
 	defer client.Close()
 
 	// When
-	objectNames, err := client.ReadObjectNames(context.Background(), test.INPUT_BUCKET_NAME)
+	objectNames, err := client.ReadObjectNames(context.Background(), test.InputBucketName)
 	if err != nil {
 		return
 	}
@@ -33,7 +33,7 @@ func TestReadObjectNames(t *testing.T) {
 
 func TestReeadObjectNames_TxtFilesOnly(t *testing.T) {
 	// Setup test
-	teardownStorage := test.CreateTestStorage(t)
+	teardownStorage := test.SetupStorageTest(t)
 	defer teardownStorage(t)
 
 	// Given
@@ -47,7 +47,7 @@ func TestReeadObjectNames_TxtFilesOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error creating storage client: %v", err)
 	}
-	bucket := c.Bucket(test.INPUT_BUCKET_NAME)
+	bucket := c.Bucket(test.InputBucketName)
 	err = bucket.Object("test.txt").Delete(context.Background())
 	if err != nil {
 		t.Fatalf("Error deleting object: %v", err)
@@ -58,7 +58,7 @@ func TestReeadObjectNames_TxtFilesOnly(t *testing.T) {
 	}
 
 	// When
-	objectNames, err := client.ReadObjectNames(context.Background(), test.INPUT_BUCKET_NAME)
+	objectNames, err := client.ReadObjectNames(context.Background(), test.InputBucketName)
 	if err != nil {
 		return
 	}
@@ -75,7 +75,7 @@ func TestReeadObjectNames_TxtFilesOnly(t *testing.T) {
 
 func TestReadObject(t *testing.T) {
 	// Setup test
-	teardownStorage := test.CreateTestStorage(t)
+	teardownStorage := test.SetupStorageTest(t)
 	defer teardownStorage(t)
 
 	// Given
@@ -89,7 +89,7 @@ func TestReadObject(t *testing.T) {
 		"quick brown fox jumps over the lazy dog.")
 
 	// When
-	data, err := client.ReadObject(context.Background(), test.INPUT_BUCKET_NAME, "test.txt")
+	data, err := client.ReadObject(context.Background(), test.InputBucketName, "test.txt")
 
 	// Then
 	assert.Nil(t, err)
@@ -98,7 +98,7 @@ func TestReadObject(t *testing.T) {
 
 func TestReadObject_CreateReaderError(t *testing.T) {
 	// Setup test
-	teardownStorage := test.CreateTestStorage(t)
+	teardownStorage := test.SetupStorageTest(t)
 	defer teardownStorage(t)
 
 	// Given
@@ -109,7 +109,7 @@ func TestReadObject_CreateReaderError(t *testing.T) {
 	defer client.Close()
 
 	// When
-	data, err := client.ReadObject(context.Background(), test.INPUT_BUCKET_NAME, "invalid-file.txt")
+	data, err := client.ReadObject(context.Background(), test.InputBucketName, "invalid-file.txt")
 
 	// Then
 	assert.NotNil(t, err)

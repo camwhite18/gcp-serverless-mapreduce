@@ -14,7 +14,7 @@ import (
 
 func TestCombine(t *testing.T) {
 	// Setup test
-	teardown, subscriptions := test.SetupTest(t, []string{pubsub.ShufflerTopic})
+	teardown, subscriptions := test.SetupPubSubTest(t, []string{pubsub.ShufflerTopic})
 	defer teardown(t)
 	// Given
 	// Create a message
@@ -74,7 +74,7 @@ func TestCombine(t *testing.T) {
 
 func TestCombine_ReadPubSubMessageError(t *testing.T) {
 	// Setup test
-	teardown, _ := test.SetupTest(t, []string{pubsub.ShufflerTopic})
+	teardown, _ := test.SetupPubSubTest(t, []string{pubsub.ShufflerTopic})
 	defer teardown(t)
 	// Given
 	// Create a message

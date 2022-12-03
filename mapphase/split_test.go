@@ -14,15 +14,15 @@ import (
 
 func TestSplitter(t *testing.T) {
 	// Setup test
-	teardown, subscriptions := test.SetupTest(t, []string{pubsub.MapperTopic, pubsub.ControllerTopic})
+	teardown, subscriptions := test.SetupPubSubTest(t, []string{pubsub.MapperTopic, pubsub.ControllerTopic})
 	defer teardown(t)
-	teardownTestStorage := test.CreateTestStorage(t)
+	teardownTestStorage := test.SetupStorageTest(t)
 	defer teardownTestStorage(t)
 
 	// Given
 	// Create a message
 	inputData := pubsub.SplitterData{
-		BucketName: test.INPUT_BUCKET_NAME,
+		BucketName: test.InputBucketName,
 		FileName:   "test.txt",
 	}
 	inputDataBytes, err := json.Marshal(inputData)
@@ -93,15 +93,15 @@ func TestSplitter(t *testing.T) {
 
 func TestSplitter_ReadFileError(t *testing.T) {
 	// Setup test
-	teardown, _ := test.SetupTest(t, []string{pubsub.MapperTopic, pubsub.ControllerTopic})
+	teardown, _ := test.SetupPubSubTest(t, []string{pubsub.MapperTopic, pubsub.ControllerTopic})
 	defer teardown(t)
-	teardownTestStorage := test.CreateTestStorage(t)
+	teardownTestStorage := test.SetupStorageTest(t)
 	defer teardownTestStorage(t)
 
 	// Given
 	// Create a message
 	inputData := pubsub.SplitterData{
-		BucketName: test.INPUT_BUCKET_NAME,
+		BucketName: test.InputBucketName,
 		FileName:   "invalid-file.txt",
 	}
 	inputDataBytes, err := json.Marshal(inputData)
@@ -132,13 +132,13 @@ func TestSplitter_ReadFileError(t *testing.T) {
 
 func TestSplitter_CreateStorageClientError(t *testing.T) {
 	// Setup test
-	teardown, _ := test.SetupTest(t, []string{pubsub.MapperTopic, pubsub.ControllerTopic})
+	teardown, _ := test.SetupPubSubTest(t, []string{pubsub.MapperTopic, pubsub.ControllerTopic})
 	defer teardown(t)
 
 	// Given
 	// Create a message
 	inputData := pubsub.SplitterData{
-		BucketName: test.INPUT_BUCKET_NAME,
+		BucketName: test.InputBucketName,
 		FileName:   "test.txt",
 	}
 	inputDataBytes, err := json.Marshal(inputData)
@@ -169,7 +169,7 @@ func TestSplitter_CreateStorageClientError(t *testing.T) {
 
 func TestSplitter_ReadPubSubMessageError(t *testing.T) {
 	// Setup test
-	teardown, _ := test.SetupTest(t, []string{pubsub.MapperTopic, pubsub.ControllerTopic})
+	teardown, _ := test.SetupPubSubTest(t, []string{pubsub.MapperTopic, pubsub.ControllerTopic})
 	defer teardown(t)
 
 	// Given
@@ -205,7 +205,7 @@ func TestSplitter_CreatePubSubClientError(t *testing.T) {
 	// Given
 	// Create a message
 	inputData := pubsub.SplitterData{
-		BucketName: test.INPUT_BUCKET_NAME,
+		BucketName: test.InputBucketName,
 		FileName:   "test.txt",
 	}
 	inputDataBytes, err := json.Marshal(inputData)

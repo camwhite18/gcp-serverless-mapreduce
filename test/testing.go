@@ -12,10 +12,13 @@ import (
 	"time"
 )
 
-const INPUT_BUCKET_NAME = "test-bucket-input"
-const OUTPUT_BUCKET_NAME = "test-bucket-output"
+const InputBucketName = "test-bucket-input"
+const OutputBucketName = "test-bucket-output"
 
-func SetupTest(tb testing.TB, topicIDs []string) (func(tb testing.TB), []*pubsub.Subscription) {
+// SetupPubSubTest creates subscriptions for testing pubsub messages. It points the PUBSUB_EMULATOR_HOST environment
+// variable towards localhost:8085 that one could run this Docker image to emulate pubsub:
+// gcr.io/google.com/cloudsdktool/cloud-sdk:latest
+func SetupPubSubTest(tb testing.TB, topicIDs []string) (func(tb testing.TB), []*pubsub.Subscription) {
 	// Setup test
 	// Modify the PUBSUB_EMULATOR_HOST environment variable to point to the pubsub emulator
 	existingVal := os.Getenv("PUBSUB_EMULATOR_HOST")
@@ -67,7 +70,9 @@ func SetupTest(tb testing.TB, topicIDs []string) (func(tb testing.TB), []*pubsub
 	}, subscriptions
 }
 
-func CreateTestStorage(tb testing.TB) func(tb testing.TB) {
+// SetupStorageTest creates buckets and an object for testing. It points the STORAGE_EMULATOR_HOST environment variable
+// towards localhost:8085 that one could run this Docker image to emulate pubsub: oittaa/gcp-storage-emulator
+func SetupStorageTest(tb testing.TB) func(tb testing.TB) {
 	// Setup test
 	createStorageCtx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
@@ -83,7 +88,7 @@ func CreateTestStorage(tb testing.TB) func(tb testing.TB) {
 		tb.Fatalf("Error creating storage client: %v", err)
 	}
 	// Create the input bucket
-	inputBucket := client.Bucket(INPUT_BUCKET_NAME)
+	inputBucket := client.Bucket(InputBucketName)
 	if err := inputBucket.Create(createStorageCtx, "serverless-mapreduce", nil); err != nil &&
 		!strings.Contains(err.Error(), "already own this bucket") {
 		tb.Fatalf("Error creating inputBucket: %v", err)
@@ -99,7 +104,7 @@ func CreateTestStorage(tb testing.TB) func(tb testing.TB) {
 		tb.Fatalf("Error closing inputBucket: %v", err)
 	}
 	// Create the output bucket
-	outputBucket := client.Bucket(OUTPUT_BUCKET_NAME)
+	outputBucket := client.Bucket(OutputBucketName)
 	defer cancel()
 	if err := outputBucket.Create(createStorageCtx, "serverless-mapreduce", nil); err != nil &&
 		!strings.Contains(err.Error(), "already own this bucket") {
@@ -154,13 +159,16 @@ func CreateTestStorage(tb testing.TB) func(tb testing.TB) {
 	}
 }
 
+// SetupRedisTest creates a Redis client and points the REDIS_HOST/REDIS_HOSTS environment variables towards
+// localhost that one could run this Docker image to emulate Redis: redis/redis-stack:latest
 func SetupRedisTest(tb testing.TB) func(tb testing.TB) {
-	// Setup test
+	// Replace the REDIS_HOST environment variable with localhost
 	existingRedisHostVal := os.Getenv("REDIS_HOST")
 	err := os.Setenv("REDIS_HOST", "localhost")
 	if err != nil {
 		tb.Fatalf("Error setting environment variable: %v", err)
 	}
+	// Replace the REDIS_HOSTS environment variable with localhost
 	existingRedisHostsVal := os.Getenv("REDIS_HOSTS")
 	var redisHosts []string
 	for i := 0; i < redis.NoOfRedisInstances; i++ {
@@ -170,17 +178,19 @@ func SetupRedisTest(tb testing.TB) func(tb testing.TB) {
 	if err != nil {
 		tb.Fatalf("Error setting environment variable: %v", err)
 	}
+	// Initialize the Redis clients
 	redis.InitSingleRedisClient()
 	redis.InitMultiRedisClient()
 
 	return func(tb testing.TB) {
 		// Teardown test
 		redis.SingleRedisClient.FlushAll(context.Background())
-		// Reset the REDIS_HOST environment variable
+		// Reset the REDIS_HOSTS environment variable
 		err = os.Setenv("REDIS_HOSTS", existingRedisHostsVal)
 		if err != nil {
 			tb.Fatalf("Error setting environment variable: %v", err)
 		}
+		// Reset the REDIS_HOST environment variable
 		err = os.Setenv("REDIS_HOST", existingRedisHostVal)
 		if err != nil {
 			tb.Fatalf("Error setting environment variable: %v", err)

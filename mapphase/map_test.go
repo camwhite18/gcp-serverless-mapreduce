@@ -14,7 +14,7 @@ import (
 
 func TestMapper(t *testing.T) {
 	// Setup test
-	teardown, subscriptions := test.SetupTest(t, []string{pubsub.CombineTopic})
+	teardown, subscriptions := test.SetupPubSubTest(t, []string{pubsub.CombineTopic})
 	defer teardown(t)
 	// Given
 	// Create a message
@@ -71,7 +71,7 @@ func TestMapper(t *testing.T) {
 
 func TestMapper_ReadPubSubMessageError(t *testing.T) {
 	// Setup test
-	teardown, _ := test.SetupTest(t, []string{pubsub.CombineTopic})
+	teardown, _ := test.SetupPubSubTest(t, []string{pubsub.CombineTopic})
 	defer teardown(t)
 	// Given
 	// Create a message

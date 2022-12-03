@@ -13,7 +13,7 @@ import (
 
 func TestReadPubSubMessage(t *testing.T) {
 	// Setup test
-	teardown, _ := test.SetupTest(t, []string{})
+	teardown, _ := test.SetupPubSubTest(t, []string{})
 	defer teardown(t)
 
 	// Given
@@ -53,7 +53,7 @@ func TestReadPubSubMessage(t *testing.T) {
 
 func TestReadPubSubMessage_UnmarshalDataError(t *testing.T) {
 	// Setup test
-	teardown, _ := test.SetupTest(t, []string{})
+	teardown, _ := test.SetupPubSubTest(t, []string{})
 	defer teardown(t)
 
 	// Given
@@ -93,7 +93,7 @@ func TestReadPubSubMessage_UnmarshalDataError(t *testing.T) {
 
 func TestSendPubSubMessage(t *testing.T) {
 	// Setup test
-	teardown, subscriptions := test.SetupTest(t, []string{"some-topic"})
+	teardown, subscriptions := test.SetupPubSubTest(t, []string{"some-topic"})
 	defer teardown(t)
 
 	// Given

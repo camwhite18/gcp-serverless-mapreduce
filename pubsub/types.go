@@ -2,18 +2,37 @@ package pubsub
 
 import "time"
 
+// MaxMessageSizeBytes is the maximum size of a pubsub message in bytes.
 const MaxMessageSizeBytes = 50000
+
+// MaxMessageCount is the maximum number of messages that can be sent in a single batch.
 const MaxMessageCount = 100
+
+// MaxMessageDelay is the maximum delay between sending messages in a batch.
 const MaxMessageDelay = 50 * time.Millisecond
 
+// ControllerTopic is the name of the topic that the controller reads from.
 const ControllerTopic = "mapreduce-controller"
+
+// SplitterTopic is the name of the topic that the splitter reads from.
 const SplitterTopic = "mapreduce-splitter"
+
+// MapperTopic is the name of the topic that the mapper reads from.
 const MapperTopic = "mapreduce-mapper"
+
+// CombineTopic is the name of the topic that the reducer reads from.
 const CombineTopic = "mapreduce-combine"
+
+// ShufflerTopic is the name of the topic that the shuffler reads from.
 const ShufflerTopic = "mapreduce-shuffler"
+
+// ReducerTopic is the name of the topic that the reducer reads from.
 const ReducerTopic = "mapreduce-reducer"
 
+// StatusStarted is the status of a partition when it has been pushed to the MapperTopic.
 const StatusStarted = "started"
+
+// StatusFinished is the status of a partition when its mapped text has been added to the Redis instances.
 const StatusFinished = "finished"
 
 // MessagePublishedData is a struct that represents the data of a pubsub message published event.

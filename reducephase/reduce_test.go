@@ -15,16 +15,16 @@ import (
 
 func TestReducer(t *testing.T) {
 	// Given
-	teardown, _ := test.SetupTest(t, []string{})
+	teardown, _ := test.SetupPubSubTest(t, []string{})
 	defer teardown(t)
-	teardownStorage := test.CreateTestStorage(t)
+	teardownStorage := test.SetupStorageTest(t)
 	defer teardownStorage(t)
 	teardownRedis := test.SetupRedisTest(t)
 	defer teardownRedis(t)
 
 	message := pubsub.MessagePublishedData{
 		Message: pubsub.Message{
-			Attributes: map[string]string{"outputBucket": test.OUTPUT_BUCKET_NAME, "redisNum": "1"},
+			Attributes: map[string]string{"outputBucket": test.OutputBucketName, "redisNum": "1"},
 		},
 	}
 	// Create a CloudEvent to be sent to the mapper
@@ -55,7 +55,7 @@ func TestReducer(t *testing.T) {
 		t.Fatalf("Error creating storage client: %v", err)
 	}
 	// Create a reader to read the file
-	reader, err := client.Bucket(test.OUTPUT_BUCKET_NAME).Object("anagrams-part-1.txt").NewReader(storageCtx)
+	reader, err := client.Bucket(test.OutputBucketName).Object("anagrams-part-1.txt").NewReader(storageCtx)
 	if err != nil {
 		t.Fatalf("Error creating reader: %v", err)
 	}
@@ -71,14 +71,14 @@ func TestReducer(t *testing.T) {
 
 func TestReducer_CreateStorageClientWithWriterError(t *testing.T) {
 	// Given
-	teardown, _ := test.SetupTest(t, []string{})
+	teardown, _ := test.SetupPubSubTest(t, []string{})
 	defer teardown(t)
 	teardownRedis := test.SetupRedisTest(t)
 	defer teardownRedis(t)
 
 	message := pubsub.MessagePublishedData{
 		Message: pubsub.Message{
-			Attributes: map[string]string{"outputBucket": test.OUTPUT_BUCKET_NAME, "redisNum": "1"},
+			Attributes: map[string]string{"outputBucket": test.OutputBucketName, "redisNum": "1"},
 		},
 	}
 	// Create a CloudEvent to be sent to the mapper
@@ -99,14 +99,14 @@ func TestReducer_CreateStorageClientWithWriterError(t *testing.T) {
 
 func TestReducer_CreatePubSubClientError(t *testing.T) {
 	// Given
-	teardownStorage := test.CreateTestStorage(t)
+	teardownStorage := test.SetupStorageTest(t)
 	defer teardownStorage(t)
 	teardownRedis := test.SetupRedisTest(t)
 	defer teardownRedis(t)
 
 	message := pubsub.MessagePublishedData{
 		Message: pubsub.Message{
-			Attributes: map[string]string{"outputBucket": test.OUTPUT_BUCKET_NAME, "redisNum": "1"},
+			Attributes: map[string]string{"outputBucket": test.OutputBucketName, "redisNum": "1"},
 		},
 	}
 	// Create a CloudEvent to be sent to the mapper

@@ -15,7 +15,7 @@ import (
 
 func TestMapReduceController_StatusStarted(t *testing.T) {
 	// Given
-	teardown, _ := test.SetupTest(t, []string{pubsub.ReducerTopic})
+	teardown, _ := test.SetupPubSubTest(t, []string{pubsub.ReducerTopic})
 	defer teardown(t)
 	teardownRedis := test.SetupRedisTest(t)
 	defer teardownRedis(t)
@@ -59,7 +59,7 @@ func TestMapReduceController_StatusStarted(t *testing.T) {
 
 func TestMapReduceController_StatusFinished(t *testing.T) {
 	// Given
-	teardown, subscriptions := test.SetupTest(t, []string{pubsub.ReducerTopic})
+	teardown, subscriptions := test.SetupPubSubTest(t, []string{pubsub.ReducerTopic})
 	defer teardown(t)
 	teardownRedis := test.SetupRedisTest(t)
 	defer teardownRedis(t)
@@ -113,7 +113,7 @@ func TestMapReduceController_StatusFinished(t *testing.T) {
 
 func TestMapReduceController_ReadPubSubMessageError(t *testing.T) {
 	// Given
-	teardown, _ := test.SetupTest(t, []string{pubsub.ReducerTopic})
+	teardown, _ := test.SetupPubSubTest(t, []string{pubsub.ReducerTopic})
 	defer teardown(t)
 	statusMessageBytes, err := json.Marshal([]int{1, 2, 3})
 	if err != nil {

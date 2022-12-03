@@ -13,7 +13,7 @@ import (
 
 func TestShuffler(t *testing.T) {
 	// Setup test
-	teardown, _ := test.SetupTest(t, []string{pubsub.ControllerTopic})
+	teardown, _ := test.SetupPubSubTest(t, []string{pubsub.ControllerTopic})
 	defer teardown(t)
 	teardownRedis := test.SetupRedisTest(t)
 	defer teardownRedis(t)
@@ -66,7 +66,7 @@ func TestShuffler(t *testing.T) {
 
 func TestShuffler_ReadPubSubMessageError(t *testing.T) {
 	// Setup test
-	teardown, _ := test.SetupTest(t, []string{pubsub.ControllerTopic})
+	teardown, _ := test.SetupPubSubTest(t, []string{pubsub.ControllerTopic})
 	defer teardown(t)
 	teardownRedis := test.SetupRedisTest(t)
 	defer teardownRedis(t)
