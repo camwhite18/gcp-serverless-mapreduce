@@ -1,4 +1,4 @@
-package serverless_mapreduce
+package serverlessmapreduce
 
 import (
 	"github.com/GoogleCloudPlatform/functions-framework-go/functions"

@@ -12,7 +12,10 @@ import (
 	"time"
 )
 
+// InputBucketName is the name of the bucket that contains the input files in testing
 const InputBucketName = "test-bucket-input"
+
+// OutputBucketName is the name of the bucket that contains the output files in testing
 const OutputBucketName = "test-bucket-output"
 
 // SetupPubSubTest creates subscriptions for testing pubsub messages. It points the PUBSUB_EMULATOR_HOST environment
