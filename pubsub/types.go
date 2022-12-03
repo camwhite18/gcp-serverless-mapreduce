@@ -21,7 +21,7 @@ const SplitterTopic = "mapreduce-splitter"
 const MapperTopic = "mapreduce-mapper"
 
 // CombineTopic is the name of the topic that the reducer reads from.
-const CombineTopic = "mapreduce-combine"
+const CombineTopic = "mapreduce-combiner"
 
 // ShufflerTopic is the name of the topic that the shuffler reads from.
 const ShufflerTopic = "mapreduce-shuffler"

@@ -56,67 +56,59 @@ deploy-controller:
 remove-controller:
 	./controller/delete-controller.sh
 
-deploy-init-mapreduce:
-	./service/deploy-init-mapreduce.sh
+deploy-starter:
+	./mapphase/deploy-starter.sh
 
-remove-init-mapreduce:
-	./service/delete-init-mapreduce.sh
+remove-starter:
+	./mapphase/delete-starter.sh
 
 deploy-splitter:
-	./map_phase/deploy-splitter.sh
+	./mapphase/deploy-splitter.sh
 
 remove-splitter:
-	./map_phase/delete-splitter.sh
+	./mapphase/delete-splitter.sh
 
 deploy-mapper:
-	./map_phase/deploy-mapper.sh
+	./mapphase/deploy-mapper.sh
 
 remove-mapper:
-	./map_phase/delete-mapper.sh
+	./mapphase/delete-mapper.sh
 
-deploy-combine:
-	./map_phase/deploy-combine.sh
+deploy-combiner:
+	./mapphase/deploy-combiner.sh
 
-remove-combine:
-	./map_phase/delete-combine.sh
+remove-combiner:
+	./mapphase/delete-combiner.sh
 
 deploy-shuffler:
-	./reduce_phase/deploy-shuffler.sh
+	./reducephase/deploy-shuffler.sh
 
 remove-shuffler:
-	./reduce_phase/delete-shuffler.sh
+	./reducephase/delete-shuffler.sh
 
 deploy-reducer:
-	./reduce_phase/deploy-reducers.sh
+	./reducephase/deploy-reducers.sh
 
 remove-reducer:
-	./reduce_phase/delete-reducers.sh
-
-deploy-outputter:
-	./reduce_phase/deploy-outputters.sh
-
-remove-outputter:
-	./reduce_phase/delete-outputters.sh
+	./reducephase/delete-reducers.sh
 
 deploy: create-redis \
 		deploy-controller \
-		deploy-init-mapreduce \
+		deploy-starter \
 		deploy-splitter \
 		deploy-mapper \
-		deploy-combine \
+		deploy-combiner \
 		deploy-shuffler \
 		deploy-reducer \
-		deploy-outputter
 
 remove: remove-redis \
 		remove-controller \
-		remove-init-mapreduce \
+		remove-starter \
 		remove-splitter \
 		remove-mapper \
-		remove-combine \
+		remove-combiner \
 		remove-shuffler \
 		remove-reducer \
-		remove-outputter
 
 create-pubsub-emulator:
 	@docker-compose up -d pubsub-emulator

@@ -10,21 +10,21 @@ if ! [ -x "$(command -v gcloud)" ]; then
 fi
 
 # Delete the combine
-echo "Deleting topic mapreduce-combine"
-if (gcloud pubsub topics delete mapreduce-combine \
+echo "Deleting topic mapreduce-combiner"
+if (gcloud pubsub topics delete mapreduce-combiner \
   --project="$GCP_PROJECT") ; then
-  echo "Successfully deleted topic mapreduce-combine"
+  echo "Successfully deleted topic mapreduce-combiner"
 else
-  echo "Failed to delete topic mapreduce-combine"
+  echo "Failed to delete topic mapreduce-combiner"
 fi
 
 echo "Deleting combine"
-if (gcloud functions delete combine \
+if (gcloud functions delete combiner \
   --gen2 \
   --region="$GCP_REGION" \
   --project="$GCP_PROJECT" \
   --quiet) ; then
-  echo "Successfully deleted combine"
+  echo "Successfully deleted combiner"
 else
-  echo "Failed to delete combine"
+  echo "Failed to delete combiner"
 fi
