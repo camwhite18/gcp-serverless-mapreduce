@@ -1,7 +1,7 @@
 image: golang:1.16
 
 stages:
-- format
+- build
 - test
 - unit
 
@@ -10,12 +10,12 @@ include:
 - template: Security/Dependency-Scanning.gitlab-ci.yml
 
 vet:
-    stage: format
+    stage: build
     script:
     - go vet ./...
 
 golint:
-  stage: format
+  stage: test
   script:
     - go install golang.org/x/lint/golint@latest
     - golint -set_exit_status ./...
@@ -29,9 +29,11 @@ staticcheck:
 unit-test:
     stage: unit
     script:
+      - make setup-test
       - make test-unit
 
 coverage:
     stage: unit
     script:
+      - make setup-test
       - make test-coverage
