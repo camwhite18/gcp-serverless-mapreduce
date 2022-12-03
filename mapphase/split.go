@@ -71,7 +71,7 @@ func splitFile(ctx context.Context, bucketName, fileName string) ([][]string, er
 	// Remove non-unique words:
 	uniqueSplitText := removeDuplicateWords(splitText)
 	// Partition the file since this will speed up the map phase
-	partitionedText := partitionFile(uniqueSplitText, pubsub.MAX_MESSAGE_SIZE_BYTES)
+	partitionedText := partitionFile(uniqueSplitText, pubsub.MaxMessageSizeBytes)
 	return partitionedText, nil
 }
 
@@ -159,7 +159,7 @@ func sendTextToMapper(pubsubClient pubsub.Client, attributes map[string]string,
 			// Send a message to the controller topic to let it know that a partition has been published
 			sendIDToController(pubsubClient, partitionAttributes)
 			// Publish the partition to the Mapper topic
-			pubsubClient.SendPubSubMessage(pubsub.MAPPER_TOPIC, partition, partitionAttributes)
+			pubsubClient.SendPubSubMessage(pubsub.MapperTopic, partition, partitionAttributes)
 		}(partition)
 	}
 	wg.Wait()
@@ -172,9 +172,9 @@ func sendIDToController(pubsubClient pubsub.Client, attributes map[string]string
 	attributes["partitionId"] = uuid.New().String()
 	// Create the data to be sent to the controller
 	statusMessage := pubsub.ControllerMessage{
-		Id:     attributes["partitionId"],
-		Status: pubsub.STATUS_STARTED,
+		ID:     attributes["partitionId"],
+		Status: pubsub.StatusStarted,
 	}
 	// Send the message to the controller
-	pubsubClient.SendPubSubMessage(pubsub.CONTROLLER_TOPIC, statusMessage, nil)
+	pubsubClient.SendPubSubMessage(pubsub.ControllerTopic, statusMessage, nil)
 }

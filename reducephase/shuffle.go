@@ -43,10 +43,10 @@ func Shuffler(ctx context.Context, e event.Event) error {
 	}
 	// Send a message to the controller topic to let it know that the shuffling is complete for the partition
 	statusMessage := pubsub.ControllerMessage{
-		Id:     attributes["partitionId"],
-		Status: pubsub.STATUS_FINISHED,
+		ID:     attributes["partitionId"],
+		Status: pubsub.StatusFinished,
 	}
-	pubsubClient.SendPubSubMessage(pubsub.CONTROLLER_TOPIC, statusMessage, attributes)
+	pubsubClient.SendPubSubMessage(pubsub.ControllerTopic, statusMessage, attributes)
 	log.Printf("Shuffling took %v", time.Since(start))
 	return nil
 }
@@ -86,7 +86,7 @@ func partitioner(s string) int {
 	_, _ = h.Write([]byte(s))
 	hashedString := h.Sum32()
 	// Take the modulus of the hashed word with the total number of reducers
-	return int(hashedString % uint32(r.NO_OF_REDIS_INSTANCES))
+	return int(hashedString % uint32(r.NoOfRedisInstances))
 }
 
 // addToRedis takes a map of reducer number to a list of MappedWord objects and adds each list of MappedWord objects

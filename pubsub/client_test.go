@@ -22,7 +22,7 @@ func TestReadPubSubMessage(t *testing.T) {
 		t.Fatalf("Error marshalling data: %v", err)
 	}
 	message := MessagePublishedData{
-		Message: PubSubMessage{
+		Message: Message{
 			Data:       inputDataBytes,
 			Attributes: map[string]string{"some-key": "some-value"},
 		},
@@ -62,7 +62,7 @@ func TestReadPubSubMessage_UnmarshalDataError(t *testing.T) {
 		t.Fatalf("Error marshalling data: %v", err)
 	}
 	message := MessagePublishedData{
-		Message: PubSubMessage{
+		Message: Message{
 			Data:       inputDataBytes,
 			Attributes: make(map[string]string),
 		},

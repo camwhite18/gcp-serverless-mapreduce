@@ -74,7 +74,7 @@ func StartMapReduce(w http.ResponseWriter, r *http.Request) {
 		// Use a goroutine to send the messages concurrently -> this is faster than sending them sequentially
 		go func() {
 			defer wg.Done()
-			pubsubClient.SendPubSubMessage(pubsub.SPLITTER_TOPIC, splitterData, map[string]string{"outputBucket": outputBucketName})
+			pubsubClient.SendPubSubMessage(pubsub.SplitterTopic, splitterData, map[string]string{"outputBucket": outputBucketName})
 		}()
 	}
 	// Use a wait group so we can wait for all the messages to be sent before sending a response

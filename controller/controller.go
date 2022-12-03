@@ -15,7 +15,7 @@ import (
 // once a partition has been added to the redis instances. A message is then sent to the reducer to start reducing the
 // data in each redis instance
 func Controller(ctx context.Context, e event.Event) error {
-	r.InitRedisClient()
+	r.InitSingleRedisClient()
 	// Create a new pubsub client
 	pubsubClient, err := pubsub.New(ctx, e)
 	if err != nil {
@@ -32,15 +32,15 @@ func Controller(ctx context.Context, e event.Event) error {
 	// We need to perform different actions depending on the status of the message
 	switch statusMessage.Status {
 	// If the status is "started", then we add the partition uuid to the set in redis
-	case pubsub.STATUS_STARTED:
+	case pubsub.StatusStarted:
 		// Use SADD to add the partition uuid to the 'started-processing' set in redis
-		res := r.RedisClient.SAdd(ctx, "started-processing", statusMessage.Id)
+		res := r.SingleRedisClient.SAdd(ctx, "started-processing", statusMessage.ID)
 		if res.Err() != nil {
 			return fmt.Errorf("error pushing value to set in redis: %v", res.Err())
 		}
 	// If the status is "finished", then we remove the partition uuid from the set in redis, and check if the set is empty.
-	case pubsub.STATUS_FINISHED:
-		res := r.RedisClient.SRem(ctx, "started-processing", statusMessage.Id)
+	case pubsub.StatusFinished:
+		res := r.SingleRedisClient.SRem(ctx, "started-processing", statusMessage.ID)
 		if res.Err() != nil {
 			return fmt.Errorf("error removing value from set in redis: %v", res.Err())
 		}
@@ -57,7 +57,7 @@ func Controller(ctx context.Context, e event.Event) error {
 // reducer topic for each redis instance to start a reducing job on each
 func checkSetCardinality(ctx context.Context, client pubsub.Client, attributes map[string]string) error {
 	// Use SCARD to get the cardinality of the 'started-processing' set in redis
-	cardinality, err := r.RedisClient.SCard(ctx, "started-processing").Result()
+	cardinality, err := r.SingleRedisClient.SCard(ctx, "started-processing").Result()
 	if err != nil {
 		return fmt.Errorf("error checking if set is empty: %v", err)
 	}
@@ -65,7 +65,7 @@ func checkSetCardinality(ctx context.Context, client pubsub.Client, attributes m
 	if cardinality == int64(0) {
 		// Send a message to start a reducer job on each redis instance
 		var wg sync.WaitGroup
-		for i := 0; i < r.NO_OF_REDIS_INSTANCES; i++ {
+		for i := 0; i < r.NoOfRedisInstances; i++ {
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()
@@ -76,7 +76,7 @@ func checkSetCardinality(ctx context.Context, client pubsub.Client, attributes m
 				}
 				reducerAttributes["redisNum"] = strconv.Itoa(i)
 				// Create a message to send to the reducer
-				client.SendPubSubMessage(pubsub.REDUCER_TOPIC, nil, reducerAttributes)
+				client.SendPubSubMessage(pubsub.ReducerTopic, nil, reducerAttributes)
 			}(i)
 		}
 		// Wait for all the messages to be sent before returning

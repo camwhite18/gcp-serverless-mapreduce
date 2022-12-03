@@ -52,7 +52,7 @@ func Mapper(ctx context.Context, e event.Event) error {
 	}
 	// Create a client for the combine topic
 	// Send one pubsub message to the combiner per book to reduce the number of invocations -> reduce cost
-	pubsubClient.SendPubSubMessage(pubsub.COMBINE_TOPIC, mappedText, attributes)
+	pubsubClient.SendPubSubMessage(pubsub.CombineTopic, mappedText, attributes)
 	log.Printf("Mapper took %v to run", time.Since(start))
 	return nil
 }

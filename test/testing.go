@@ -163,19 +163,19 @@ func SetupRedisTest(tb testing.TB) func(tb testing.TB) {
 	}
 	existingRedisHostsVal := os.Getenv("REDIS_HOSTS")
 	var redisHosts []string
-	for i := 0; i < redis.NO_OF_REDIS_INSTANCES; i++ {
+	for i := 0; i < redis.NoOfRedisInstances; i++ {
 		redisHosts = append(redisHosts, "localhost")
 	}
 	err = os.Setenv("REDIS_HOSTS", strings.Join(redisHosts, " "))
 	if err != nil {
 		tb.Fatalf("Error setting environment variable: %v", err)
 	}
-	redis.InitRedisClient()
+	redis.InitSingleRedisClient()
 	redis.InitMultiRedisClient()
 
 	return func(tb testing.TB) {
 		// Teardown test
-		redis.RedisClient.FlushAll(context.Background())
+		redis.SingleRedisClient.FlushAll(context.Background())
 		// Reset the REDIS_HOST environment variable
 		err = os.Setenv("REDIS_HOSTS", existingRedisHostsVal)
 		if err != nil {

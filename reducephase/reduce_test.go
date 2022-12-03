@@ -23,7 +23,7 @@ func TestReducer(t *testing.T) {
 	defer teardownRedis(t)
 
 	message := pubsub.MessagePublishedData{
-		Message: pubsub.PubSubMessage{
+		Message: pubsub.Message{
 			Attributes: map[string]string{"outputBucket": test.OUTPUT_BUCKET_NAME, "redisNum": "1"},
 		},
 	}
@@ -77,7 +77,7 @@ func TestReducer_CreateStorageClientWithWriterError(t *testing.T) {
 	defer teardownRedis(t)
 
 	message := pubsub.MessagePublishedData{
-		Message: pubsub.PubSubMessage{
+		Message: pubsub.Message{
 			Attributes: map[string]string{"outputBucket": test.OUTPUT_BUCKET_NAME, "redisNum": "1"},
 		},
 	}
@@ -105,7 +105,7 @@ func TestReducer_CreatePubSubClientError(t *testing.T) {
 	defer teardownRedis(t)
 
 	message := pubsub.MessagePublishedData{
-		Message: pubsub.PubSubMessage{
+		Message: pubsub.Message{
 			Attributes: map[string]string{"outputBucket": test.OUTPUT_BUCKET_NAME, "redisNum": "1"},
 		},
 	}

@@ -2,39 +2,44 @@ package pubsub
 
 import "time"
 
-const MAX_MESSAGE_SIZE_BYTES = 50000
-const MAX_MESSAGE_COUNT = 100
-const MAX_MESSAGE_DELAY = 50 * time.Millisecond
+const MaxMessageSizeBytes = 50000
+const MaxMessageCount = 100
+const MaxMessageDelay = 50 * time.Millisecond
 
-const CONTROLLER_TOPIC = "mapreduce-controller"
-const SPLITTER_TOPIC = "mapreduce-splitter"
-const MAPPER_TOPIC = "mapreduce-mapper"
-const COMBINE_TOPIC = "mapreduce-combine"
-const SHUFFLER_TOPIC = "mapreduce-shuffler"
-const REDUCER_TOPIC = "mapreduce-reducer"
+const ControllerTopic = "mapreduce-controller"
+const SplitterTopic = "mapreduce-splitter"
+const MapperTopic = "mapreduce-mapper"
+const CombineTopic = "mapreduce-combine"
+const ShufflerTopic = "mapreduce-shuffler"
+const ReducerTopic = "mapreduce-reducer"
 
-const STATUS_STARTED = "started"
-const STATUS_FINISHED = "finished"
+const StatusStarted = "started"
+const StatusFinished = "finished"
 
+// MessagePublishedData is a struct that represents the data of a pubsub message published event.
 type MessagePublishedData struct {
-	Message PubSubMessage `json:"message"`
+	Message Message `json:"message"`
 }
 
-type PubSubMessage struct {
+// Message is a JSON field of MessagePublishedData.
+type Message struct {
 	Data       []byte            `json:"data"`
 	Attributes map[string]string `json:"attributes"`
 }
 
+// ControllerMessage is a message sent to the controller.
 type ControllerMessage struct {
-	Id     string `json:"id"`
+	ID     string `json:"id"`
 	Status string `json:"status"`
 }
 
+// MappedWord is the output of the mapper.
 type MappedWord struct {
 	SortedWord string              `json:"sortedWord"`
 	Anagrams   map[string]struct{} `json:"anagrams"`
 }
 
+// SplitterData is the data sent to the splitter.
 type SplitterData struct {
 	BucketName string `json:"bucketName"`
 	FileName   string `json:"fileName"`

@@ -10,6 +10,7 @@ import (
 	"strings"
 )
 
+// Client is an interface for interacting with storage.
 type Client interface {
 	Close()
 	ReadObjectNames(ctx context.Context, bucketName string) ([]string, error)
@@ -24,6 +25,7 @@ type clientImpl struct {
 
 var _ Client = &clientImpl{}
 
+// New returns a new storage client.
 func New(ctx context.Context) (Client, error) {
 	client, err := storage.NewClient(ctx)
 	if err != nil {
@@ -34,6 +36,7 @@ func New(ctx context.Context) (Client, error) {
 	}, nil
 }
 
+// NewWithWriter returns a new storage client with a writer for the given bucket and object.
 func NewWithWriter(ctx context.Context, bucketName, objectName string) (Client, error) {
 	client, err := storage.NewClient(ctx)
 	if err != nil {
@@ -45,11 +48,13 @@ func NewWithWriter(ctx context.Context, bucketName, objectName string) (Client, 
 	}, nil
 }
 
+// Close closes the storage client.
 func (c *clientImpl) Close() {
 	err := c.client.Close()
 	if err != nil {
 		log.Println("Error closing storage client: ", err)
 	}
+	// Close the writer if it exists
 	if c.writer != nil {
 		err = c.writer.Close()
 		if err != nil {
@@ -58,6 +63,7 @@ func (c *clientImpl) Close() {
 	}
 }
 
+// ReadObjectNames returns the names of all objects in the given bucket.
 func (c *clientImpl) ReadObjectNames(ctx context.Context, bucketName string) ([]string, error) {
 	// Iterate over all objects in the bucket and add each file name to the files slice
 	objects := c.client.Bucket(bucketName).Objects(ctx, nil)
@@ -78,6 +84,7 @@ func (c *clientImpl) ReadObjectNames(ctx context.Context, bucketName string) ([]
 	return files, nil
 }
 
+// ReadObject returns the contents of the given object in the given bucket.
 func (c *clientImpl) ReadObject(ctx context.Context, bucketName, objectName string) ([]byte, error) {
 	// Create a reader for the file
 	rc, err := c.client.Bucket(bucketName).Object(objectName).NewReader(ctx)
@@ -93,8 +100,11 @@ func (c *clientImpl) ReadObject(ctx context.Context, bucketName, objectName stri
 	return data, nil
 }
 
+// WriteData writes the given data to the storage client's writer.
 func (c *clientImpl) WriteData(key string, value []string) {
+	// Create a string from the key and the value slice
 	data := fmt.Sprintf("%s: %s\n", key, strings.Join(value, " "))
+	// Write the data to the writer
 	_, err := c.writer.Write([]byte(data))
 	if err != nil {
 		log.Println("Error writing data to file: ", err)

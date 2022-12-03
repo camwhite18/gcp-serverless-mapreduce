@@ -15,13 +15,13 @@ import (
 
 func TestMapReduceController_StatusStarted(t *testing.T) {
 	// Given
-	teardown, _ := test.SetupTest(t, []string{pubsub.REDUCER_TOPIC})
+	teardown, _ := test.SetupTest(t, []string{pubsub.ReducerTopic})
 	defer teardown(t)
 	teardownRedis := test.SetupRedisTest(t)
 	defer teardownRedis(t)
 	statusMessage := pubsub.ControllerMessage{
-		Id:     "12345",
-		Status: pubsub.STATUS_STARTED,
+		ID:     "12345",
+		Status: pubsub.StatusStarted,
 	}
 	// Create a message
 	statusMessageBytes, err := json.Marshal(statusMessage)
@@ -29,7 +29,7 @@ func TestMapReduceController_StatusStarted(t *testing.T) {
 		t.Fatalf("Error marshalling status message: %v", err)
 	}
 	message := pubsub.MessagePublishedData{
-		Message: pubsub.PubSubMessage{
+		Message: pubsub.Message{
 			Data: statusMessageBytes,
 		},
 	}
@@ -50,7 +50,7 @@ func TestMapReduceController_StatusStarted(t *testing.T) {
 	// Then
 	assert.Nil(t, err)
 
-	result := redis.RedisClient.SMembers(context.Background(), "started-processing")
+	result := redis.SingleRedisClient.SMembers(context.Background(), "started-processing")
 	if result.Err() != nil {
 		t.Fatalf("Error getting data from redis: %v", result.Err())
 	}
@@ -59,13 +59,13 @@ func TestMapReduceController_StatusStarted(t *testing.T) {
 
 func TestMapReduceController_StatusFinished(t *testing.T) {
 	// Given
-	teardown, subscriptions := test.SetupTest(t, []string{pubsub.REDUCER_TOPIC})
+	teardown, subscriptions := test.SetupTest(t, []string{pubsub.ReducerTopic})
 	defer teardown(t)
 	teardownRedis := test.SetupRedisTest(t)
 	defer teardownRedis(t)
 	statusMessage := pubsub.ControllerMessage{
-		Id:     "12345",
-		Status: pubsub.STATUS_FINISHED,
+		ID:     "12345",
+		Status: pubsub.StatusFinished,
 	}
 	// Create a message
 	statusMessageBytes, err := json.Marshal(statusMessage)
@@ -73,7 +73,7 @@ func TestMapReduceController_StatusFinished(t *testing.T) {
 		t.Fatalf("Error marshalling status message: %v", err)
 	}
 	message := pubsub.MessagePublishedData{
-		Message: pubsub.PubSubMessage{
+		Message: pubsub.Message{
 			Data:       statusMessageBytes,
 			Attributes: map[string]string{"reducerNum": "0"},
 		},
@@ -87,7 +87,7 @@ func TestMapReduceController_StatusFinished(t *testing.T) {
 		t.Fatalf("Error setting event data: %v", err)
 	}
 
-	redis.RedisClient.SAdd(context.Background(), "started-processing", "12345")
+	redis.SingleRedisClient.SAdd(context.Background(), "started-processing", "12345")
 
 	// When
 	err = Controller(context.Background(), e)
@@ -104,7 +104,7 @@ func TestMapReduceController_StatusFinished(t *testing.T) {
 	// Ensure there are no errors returned by the receiver
 	assert.Nil(t, err)
 
-	cardinality, err := redis.RedisClient.SCard(context.Background(), "started-processing").Result()
+	cardinality, err := redis.SingleRedisClient.SCard(context.Background(), "started-processing").Result()
 	if err != nil {
 		t.Fatalf("Error getting data from redis: %v", err)
 	}
@@ -113,14 +113,14 @@ func TestMapReduceController_StatusFinished(t *testing.T) {
 
 func TestMapReduceController_ReadPubSubMessageError(t *testing.T) {
 	// Given
-	teardown, _ := test.SetupTest(t, []string{pubsub.REDUCER_TOPIC})
+	teardown, _ := test.SetupTest(t, []string{pubsub.ReducerTopic})
 	defer teardown(t)
 	statusMessageBytes, err := json.Marshal([]int{1, 2, 3})
 	if err != nil {
 		t.Fatalf("Error marshalling status message: %v", err)
 	}
 	message := pubsub.MessagePublishedData{
-		Message: pubsub.PubSubMessage{
+		Message: pubsub.Message{
 			Data: statusMessageBytes,
 		},
 	}
@@ -146,8 +146,8 @@ func TestMapReduceController_CreatePubSubClientError(t *testing.T) {
 	teardownRedis := test.SetupRedisTest(t)
 	defer teardownRedis(t)
 	statusMessage := pubsub.ControllerMessage{
-		Id:     "12345",
-		Status: pubsub.STATUS_STARTED,
+		ID:     "12345",
+		Status: pubsub.StatusStarted,
 	}
 	// Create a message
 	statusMessageBytes, err := json.Marshal(statusMessage)
@@ -155,7 +155,7 @@ func TestMapReduceController_CreatePubSubClientError(t *testing.T) {
 		t.Fatalf("Error marshalling status message: %v", err)
 	}
 	message := pubsub.MessagePublishedData{
-		Message: pubsub.PubSubMessage{
+		Message: pubsub.Message{
 			Data: statusMessageBytes,
 		},
 	}

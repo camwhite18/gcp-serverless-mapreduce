@@ -14,7 +14,7 @@ import (
 
 func TestMapper(t *testing.T) {
 	// Setup test
-	teardown, subscriptions := test.SetupTest(t, []string{pubsub.COMBINE_TOPIC})
+	teardown, subscriptions := test.SetupTest(t, []string{pubsub.CombineTopic})
 	defer teardown(t)
 	// Given
 	// Create a message
@@ -24,7 +24,7 @@ func TestMapper(t *testing.T) {
 		t.Fatalf("Error marshalling Mapper data: %v", err)
 	}
 	message := pubsub.MessagePublishedData{
-		Message: pubsub.PubSubMessage{
+		Message: pubsub.Message{
 			Data:       inputDataBytes,
 			Attributes: make(map[string]string),
 		},
@@ -71,7 +71,7 @@ func TestMapper(t *testing.T) {
 
 func TestMapper_ReadPubSubMessageError(t *testing.T) {
 	// Setup test
-	teardown, _ := test.SetupTest(t, []string{pubsub.COMBINE_TOPIC})
+	teardown, _ := test.SetupTest(t, []string{pubsub.CombineTopic})
 	defer teardown(t)
 	// Given
 	// Create a message
@@ -81,7 +81,7 @@ func TestMapper_ReadPubSubMessageError(t *testing.T) {
 		t.Fatalf("Error marshalling Mapper data: %v", err)
 	}
 	message := pubsub.MessagePublishedData{
-		Message: pubsub.PubSubMessage{
+		Message: pubsub.Message{
 			Data:       inputDataBytes,
 			Attributes: make(map[string]string),
 		},
@@ -111,7 +111,7 @@ func TestMapper_CreatePubSubClientError(t *testing.T) {
 		t.Fatalf("Error marshalling Mapper data: %v", err)
 	}
 	message := pubsub.MessagePublishedData{
-		Message: pubsub.PubSubMessage{
+		Message: pubsub.Message{
 			Data:       inputDataBytes,
 			Attributes: make(map[string]string),
 		},

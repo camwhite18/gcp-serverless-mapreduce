@@ -9,6 +9,7 @@ import (
 	"log"
 )
 
+// Client is an interface for interacting with pubsub.
 type Client interface {
 	Close()
 	ReadPubSubMessage(data interface{}) (map[string]string, error)
@@ -23,6 +24,7 @@ type clientImpl struct {
 
 var _ Client = &clientImpl{}
 
+// New returns a new pubsub client.
 func New(ctx context.Context, e event.Event) (Client, error) {
 	// Create a pubsub client
 	client, err := pubsub.NewClient(ctx, "serverless-mapreduce")
@@ -36,6 +38,7 @@ func New(ctx context.Context, e event.Event) (Client, error) {
 	}, nil
 }
 
+// Close closes the pubsub client.
 func (c clientImpl) Close() {
 	err := c.client.Close()
 	if err != nil {
@@ -71,9 +74,9 @@ func (c clientImpl) SendPubSubMessage(topicName string, data interface{}, attrib
 	topic := c.client.Topic(topicName)
 	defer topic.Stop()
 	// Set the topic publish settings
-	topic.PublishSettings.ByteThreshold = MAX_MESSAGE_SIZE_BYTES
-	topic.PublishSettings.CountThreshold = MAX_MESSAGE_COUNT
-	topic.PublishSettings.DelayThreshold = MAX_MESSAGE_DELAY
+	topic.PublishSettings.ByteThreshold = MaxMessageSizeBytes
+	topic.PublishSettings.CountThreshold = MaxMessageCount
+	topic.PublishSettings.DelayThreshold = MaxMessageDelay
 	// Push the message to the topic
 	result := topic.Publish(c.ctx, &pubsub.Message{
 		Data:       dataBytes,

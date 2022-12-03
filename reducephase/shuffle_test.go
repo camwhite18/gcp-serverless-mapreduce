@@ -13,7 +13,7 @@ import (
 
 func TestShuffler(t *testing.T) {
 	// Setup test
-	teardown, _ := test.SetupTest(t, []string{pubsub.CONTROLLER_TOPIC})
+	teardown, _ := test.SetupTest(t, []string{pubsub.ControllerTopic})
 	defer teardown(t)
 	teardownRedis := test.SetupRedisTest(t)
 	defer teardownRedis(t)
@@ -28,7 +28,7 @@ func TestShuffler(t *testing.T) {
 		t.Fatalf("Error marshalling Shuffler data: %v", err)
 	}
 	message := pubsub.MessagePublishedData{
-		Message: pubsub.PubSubMessage{
+		Message: pubsub.Message{
 			Data:       inputDataBytes,
 			Attributes: make(map[string]string),
 		},
@@ -66,7 +66,7 @@ func TestShuffler(t *testing.T) {
 
 func TestShuffler_ReadPubSubMessageError(t *testing.T) {
 	// Setup test
-	teardown, _ := test.SetupTest(t, []string{pubsub.CONTROLLER_TOPIC})
+	teardown, _ := test.SetupTest(t, []string{pubsub.ControllerTopic})
 	defer teardown(t)
 	teardownRedis := test.SetupRedisTest(t)
 	defer teardownRedis(t)
@@ -78,7 +78,7 @@ func TestShuffler_ReadPubSubMessageError(t *testing.T) {
 		t.Fatalf("Error marshalling Shuffler data: %v", err)
 	}
 	message := pubsub.MessagePublishedData{
-		Message: pubsub.PubSubMessage{
+		Message: pubsub.Message{
 			Data:       inputDataBytes,
 			Attributes: make(map[string]string),
 		},
@@ -114,7 +114,7 @@ func TestShuffler_CreatePubSubClientError(t *testing.T) {
 		t.Fatalf("Error marshalling Shuffler data: %v", err)
 	}
 	message := pubsub.MessagePublishedData{
-		Message: pubsub.PubSubMessage{
+		Message: pubsub.Message{
 			Data:       inputDataBytes,
 			Attributes: make(map[string]string),
 		},

@@ -44,7 +44,7 @@ func Combine(ctx context.Context, e event.Event) error {
 		combinedKeyValues = append(combinedKeyValues, pubsub.MappedWord{SortedWord: k, Anagrams: v})
 	}
 	// Send the combined key-value pairs to the Shuffler topic
-	pubsubClient.SendPubSubMessage(pubsub.SHUFFLER_TOPIC, combinedKeyValues, attributes)
+	pubsubClient.SendPubSubMessage(pubsub.ShufflerTopic, combinedKeyValues, attributes)
 	log.Printf("Combining took %v", time.Since(start))
 	return nil
 }

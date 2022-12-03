@@ -14,7 +14,7 @@ import (
 
 func TestSplitter(t *testing.T) {
 	// Setup test
-	teardown, subscriptions := test.SetupTest(t, []string{pubsub.MAPPER_TOPIC, pubsub.CONTROLLER_TOPIC})
+	teardown, subscriptions := test.SetupTest(t, []string{pubsub.MapperTopic, pubsub.ControllerTopic})
 	defer teardown(t)
 	teardownTestStorage := test.CreateTestStorage(t)
 	defer teardownTestStorage(t)
@@ -30,7 +30,7 @@ func TestSplitter(t *testing.T) {
 		t.Fatalf("Error marshalling splitter data: %v", err)
 	}
 	message := pubsub.MessagePublishedData{
-		Message: pubsub.PubSubMessage{
+		Message: pubsub.Message{
 			Data:       inputDataBytes,
 			Attributes: make(map[string]string),
 		},
@@ -44,7 +44,7 @@ func TestSplitter(t *testing.T) {
 	}
 
 	expectedResult := []string{"the", "quick", "brown", "fox", "jumps", "over", "lazy", "dog."}
-	expectedControllerResult := pubsub.ControllerMessage{Status: pubsub.STATUS_STARTED}
+	expectedControllerResult := pubsub.ControllerMessage{Status: pubsub.StatusStarted}
 
 	// When
 	err = Splitter(context.Background(), e)
@@ -93,7 +93,7 @@ func TestSplitter(t *testing.T) {
 
 func TestSplitter_ReadFileError(t *testing.T) {
 	// Setup test
-	teardown, _ := test.SetupTest(t, []string{pubsub.MAPPER_TOPIC, pubsub.CONTROLLER_TOPIC})
+	teardown, _ := test.SetupTest(t, []string{pubsub.MapperTopic, pubsub.ControllerTopic})
 	defer teardown(t)
 	teardownTestStorage := test.CreateTestStorage(t)
 	defer teardownTestStorage(t)
@@ -109,7 +109,7 @@ func TestSplitter_ReadFileError(t *testing.T) {
 		t.Fatalf("Error marshalling splitter data: %v", err)
 	}
 	message := pubsub.MessagePublishedData{
-		Message: pubsub.PubSubMessage{
+		Message: pubsub.Message{
 			Data:       inputDataBytes,
 			Attributes: make(map[string]string),
 		},
@@ -132,7 +132,7 @@ func TestSplitter_ReadFileError(t *testing.T) {
 
 func TestSplitter_CreateStorageClientError(t *testing.T) {
 	// Setup test
-	teardown, _ := test.SetupTest(t, []string{pubsub.MAPPER_TOPIC, pubsub.CONTROLLER_TOPIC})
+	teardown, _ := test.SetupTest(t, []string{pubsub.MapperTopic, pubsub.ControllerTopic})
 	defer teardown(t)
 
 	// Given
@@ -146,7 +146,7 @@ func TestSplitter_CreateStorageClientError(t *testing.T) {
 		t.Fatalf("Error marshalling splitter data: %v", err)
 	}
 	message := pubsub.MessagePublishedData{
-		Message: pubsub.PubSubMessage{
+		Message: pubsub.Message{
 			Data:       inputDataBytes,
 			Attributes: make(map[string]string),
 		},
@@ -169,7 +169,7 @@ func TestSplitter_CreateStorageClientError(t *testing.T) {
 
 func TestSplitter_ReadPubSubMessageError(t *testing.T) {
 	// Setup test
-	teardown, _ := test.SetupTest(t, []string{pubsub.MAPPER_TOPIC, pubsub.CONTROLLER_TOPIC})
+	teardown, _ := test.SetupTest(t, []string{pubsub.MapperTopic, pubsub.ControllerTopic})
 	defer teardown(t)
 
 	// Given
@@ -180,7 +180,7 @@ func TestSplitter_ReadPubSubMessageError(t *testing.T) {
 		t.Fatalf("Error marshalling splitter data: %v", err)
 	}
 	message := pubsub.MessagePublishedData{
-		Message: pubsub.PubSubMessage{
+		Message: pubsub.Message{
 			Data:       inputDataBytes,
 			Attributes: make(map[string]string),
 		},
@@ -213,7 +213,7 @@ func TestSplitter_CreatePubSubClientError(t *testing.T) {
 		t.Fatalf("Error marshalling splitter data: %v", err)
 	}
 	message := pubsub.MessagePublishedData{
-		Message: pubsub.PubSubMessage{
+		Message: pubsub.Message{
 			Data:       inputDataBytes,
 			Attributes: make(map[string]string),
 		},
