@@ -4,18 +4,15 @@ import (
 	"context"
 	"github.com/cloudevents/sdk-go/v2/event"
 	"gitlab.com/cameron_w20/serverless-mapreduce/pubsub"
-	"log"
 	"sort"
 	"strings"
 	"sync"
-	"time"
 )
 
 // Mapper is a function that is triggered by a message being published to the Mapper topic. It reads the split text from
 // the message, pre-processes it, creates a key-value pair of the sorted word and the original word and sends the list
-// of key-value pairs to the combiner. It requires the message data to be of type []string.
+// of key-value pairs for the received partition to the combiner. It requires the message data to be of type []string.
 func Mapper(ctx context.Context, e event.Event) error {
-	start := time.Now()
 	// Create a new pubsub client
 	pubsubClient, err := pubsub.New(ctx, e)
 	if err != nil {
@@ -53,7 +50,6 @@ func Mapper(ctx context.Context, e event.Event) error {
 	// Create a client for the combine topic
 	// Send one pubsub message to the combiner per book to reduce the number of invocations -> reduce cost
 	pubsubClient.SendPubSubMessage(pubsub.CombineTopic, mappedText, attributes)
-	log.Printf("Mapper took %v to run", time.Since(start))
 	return nil
 }
 

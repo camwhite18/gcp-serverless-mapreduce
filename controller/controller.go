@@ -13,7 +13,7 @@ import (
 // Controller is a function that is triggered by a message being published to the controller topic. It is triggered by the
 // splitter for each file partition and adds the partitions uuid to a set in redis. It is also triggered by the shuffler
 // once a partition has been added to the redis instances. A message is then sent to the reducer to start reducing the
-// data in each redis instance
+// data in each redis instance once the Redis set cardinality is 0.
 func Controller(ctx context.Context, e event.Event) error {
 	r.InitSingleRedisClient()
 	// Create a new pubsub client
@@ -67,6 +67,7 @@ func checkSetCardinality(ctx context.Context, client pubsub.Client, attributes m
 		var wg sync.WaitGroup
 		for i := 0; i < r.NoOfReducerJobs; i++ {
 			wg.Add(1)
+			// Send the messages to the reducer topic concurrently to improve performance
 			go func(i int) {
 				defer wg.Done()
 				// Create a copy of the attributes map so that we can add the redis instance number to the message

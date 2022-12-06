@@ -13,14 +13,12 @@ import (
 	"regexp"
 	"strings"
 	"sync"
-	"time"
 )
 
 // Splitter is a function that is triggered by a message being published to the splitter topic. It reads the file from
 // the bucket, splits it into partitions and sends the partitions to the Mapper. It requires the message data to be of
 // type SplitterData.
 func Splitter(ctx context.Context, e event.Event) error {
-	start := time.Now()
 	// Create a new pubsub client
 	pubsubClient, err := pubsub.New(ctx, e)
 	if err != nil {
@@ -46,12 +44,11 @@ func Splitter(ctx context.Context, e event.Event) error {
 	if err != nil {
 		return fmt.Errorf("error sending text to Mapper: %v", err)
 	}
-	log.Printf("Splitter took %s", time.Since(start))
 	return nil
 }
 
-// splitFile reads a given file from a bucket, removes the text's header and footer, splits it into partitions and
-// returns the partitions as a slice of slices of strings or an error
+// splitFile reads a given file from a bucket, removes the text's header and footer, removes duplicate words,
+// splits it into partitions and returns the partitions as a slice of slices of strings or an error
 func splitFile(ctx context.Context, bucketName, fileName string) ([][]string, error) {
 	// Create a storage client
 	storageClient, err := storage.New(ctx)
@@ -136,7 +133,7 @@ func partitionFile(splitText []string, messageSize int) [][]string {
 		log.Printf("Size of data is %d bytes, so splitting into %d partitions", size, numOfPartitions)
 	}
 	partitionSize := int(math.Ceil(float64(len(splitText)) / float64(numOfPartitions)))
-	// Partition the text
+	// Create partitions of the given size from the split text
 	partitions := make([][]string, 0)
 	for i := 0; i < len(splitText); i += partitionSize {
 		end := i + partitionSize

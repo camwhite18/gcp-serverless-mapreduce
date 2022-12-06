@@ -31,20 +31,23 @@ func Reducer(ctx context.Context, e event.Event) error {
 	if err != nil {
 		return err
 	}
-	// Get the redis number and the output bucket from the attributes
+	// Get the redis number and the output bucket from the message attributes
 	redisNum := attributes["redisNum"]
 	outputBucket := attributes["outputBucket"]
 	fileName := fmt.Sprintf("anagrams-part-%s.txt", redisNum)
 
-	// Read, reduce and write to a file the key-value pairs from redis
+	defer func() {
+		// Remove all the data from the redis instance after returning
+		res := r.MultiRedisClient[redisNum].FlushAll(ctx)
+		if res.Err() != nil {
+			log.Printf("error flushing redis: %v", err)
+		}
+	}()
+
+	// Read, reduce and write the key-value pairs from redis to a file in the output bucket
 	err = reduceAnagramsFromRedis(ctx, outputBucket, fileName, redisNum)
 	if err != nil {
 		return err
-	}
-	// Remove all the data from the redis instance after it has been processed
-	res := r.MultiRedisClient[redisNum].FlushAll(ctx)
-	if res.Err() != nil {
-		log.Printf("error flushing redis: %v", err)
 	}
 	log.Printf("reducer %s took %v", redisNum, time.Since(start))
 	return nil

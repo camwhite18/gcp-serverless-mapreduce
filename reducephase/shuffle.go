@@ -15,7 +15,7 @@ import (
 
 // Shuffler is a function that is triggered by a message being published to the Shuffler topic. It receives a list of
 // MappedWord objects and shuffles them into a map of reducer number to a list of MappedWord objects. It then writes
-// each list of MappedWord objects to the appropriate redis instance. The sorting phase of MapReduce happens with how
+// each list of MappedWord objects to the appropriate redis instance. The sorting phase of MapReduce happens through how
 // the data is stored in Redis - it is stored in lists meaning all the anagrams for a given word are stored together.
 // It then sends a message to the controller topic to let it know that the shuffling is complete for the partition.
 func Shuffler(ctx context.Context, e event.Event) error {
@@ -52,7 +52,8 @@ func Shuffler(ctx context.Context, e event.Event) error {
 	return nil
 }
 
-// shuffle takes a list of MappedWord objects and shuffles them into a map of reducer number to a list of MappedWord objects
+// shuffle takes a list of MappedWord objects and shuffles them into a map of reducer number to a list of MappedWord
+// objects
 func shuffle(wordData []pubsub.MappedWord) map[int][]pubsub.MappedWord {
 	shuffledText := make(map[int][]pubsub.MappedWord)
 	var mu sync.Mutex
@@ -107,7 +108,8 @@ func addToRedis(ctx context.Context, shuffledText map[int][]pubsub.MappedWord) e
 				for word := range value.Anagrams {
 					anagrams = append(anagrams, word)
 				}
-				// Push the anagrams into the list for the sorted word in the redis instance
+				// Push the anagrams into the list for the sorted word in the redis instance, this emulates the job of
+				// the sort phase of MapReduce
 				res := r.MultiRedisClient[strconv.Itoa(reducerNum)].LPush(ctx, value.SortedWord, anagrams...)
 				if res.Err() != nil {
 					err = res.Err()
