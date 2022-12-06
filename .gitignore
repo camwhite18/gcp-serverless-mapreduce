@@ -7,3 +7,4 @@
 coc105-gutenburg-5000books/
 cloudstorage/
 serverless-mapreduce-output/
+.env

@@ -19,11 +19,10 @@ else
   exit 1
 fi
 
-num_reducers=5
 REDIS_HOSTS=$(gcloud redis instances describe mapreduce-redis-0 \
               --region="$GCP_REGION" \
               --format="value(host)")
-for ((i=1;i<num_reducers;i++)) do
+for ((i=1;i<"$NO_OF_REDUCERS";i++)) do
   REDIS_HOST=$(gcloud redis instances describe mapreduce-redis-"$i" \
                 --region="$GCP_REGION" \
                 --format="value(host)")
@@ -41,7 +40,7 @@ if (gcloud functions deploy shuffler \
     --memory=512MB \
     --project="$GCP_PROJECT" \
     --vpc-connector=projects/"$GCP_PROJECT"/locations/"$GCP_REGION"/connectors/mapreduce-connector \
-    --set-env-vars=REDIS_HOSTS="$REDIS_HOSTS",GCP_PROJECT="$GCP_PROJECT"
+    --set-env-vars=REDIS_HOSTS="$REDIS_HOSTS",GCP_PROJECT="$GCP_PROJECT",NO_OF_REDUCERS="$NO_OF_REDUCERS"
     ) ; then
   echo "Successfully deployed shuffler"
 else

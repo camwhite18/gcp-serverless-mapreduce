@@ -15,8 +15,9 @@ import (
 
 // Shuffler is a function that is triggered by a message being published to the Shuffler topic. It receives a list of
 // MappedWord objects and shuffles them into a map of reducer number to a list of MappedWord objects. It then writes
-// each list of MappedWord objects to the appropriate redis instance. It then sends a message to the controller topic
-// to let it know that the shuffling is complete for the partition.
+// each list of MappedWord objects to the appropriate redis instance. The sorting phase of MapReduce happens with how
+// the data is stored in Redis - it is stored in lists meaning all the anagrams for a given word are stored together.
+// It then sends a message to the controller topic to let it know that the shuffling is complete for the partition.
 func Shuffler(ctx context.Context, e event.Event) error {
 	start := time.Now()
 	r.InitMultiRedisClient()
@@ -86,7 +87,7 @@ func partitioner(s string) int {
 	_, _ = h.Write([]byte(s))
 	hashedString := h.Sum32()
 	// Take the modulus of the hashed word with the total number of reducers
-	return int(hashedString % uint32(r.NoOfRedisInstances))
+	return int(hashedString % uint32(r.NoOfReducerJobs))
 }
 
 // addToRedis takes a map of reducer number to a list of MappedWord objects and adds each list of MappedWord objects

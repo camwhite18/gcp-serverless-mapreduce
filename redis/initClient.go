@@ -8,8 +8,9 @@ import (
 	"strings"
 )
 
-// NoOfRedisInstances is the number of redis instances that sit in between the shufflers and the reducers
-const NoOfRedisInstances = 5
+// NoOfReducerJobs is the number of redis instances that sit in between the shufflers and the reducers, and thus
+// the number of reducer jobs that are run, by default this is 5.
+var NoOfReducerJobs = 5
 
 // SingleRedisClient is a redis client that can be used to hold a single redis client.
 var SingleRedisClient *redis.Client

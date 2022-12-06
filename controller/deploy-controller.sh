@@ -34,7 +34,7 @@ if (gcloud functions deploy controller \
     --memory=512MB \
     --project="$GCP_PROJECT" \
     --vpc-connector=projects/"$GCP_PROJECT"/locations/"$GCP_REGION"/connectors/mapreduce-connector \
-    --set-env-vars=REDIS_HOST="$REDIS_HOST",GCP_PROJECT="$GCP_PROJECT"
+    --set-env-vars=REDIS_HOST="$REDIS_HOST",GCP_PROJECT="$GCP_PROJECT",NO_OF_REDUCERS="$NO_OF_REDUCERS"
     ) ; then
   echo "Successfully deployed controller"
 else

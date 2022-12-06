@@ -4,6 +4,7 @@ stages:
 - build
 - test
 - unit
+- deploy
 
 include:
 - template: Security/SAST.gitlab-ci.yml
@@ -37,3 +38,11 @@ coverage:
     script:
       - make setup-test
       - make test-coverage
+
+deploy:
+    stage: deploy
+    script:
+      - cp .env.example .env
+      - make deploy
+    only:
+      - master
