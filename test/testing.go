@@ -84,7 +84,7 @@ func SetupPubSubTest(tb testing.TB, topicIDs []string) (func(tb testing.TB), []*
 }
 
 // SetupStorageTest creates buckets and an object for testing. It points the STORAGE_EMULATOR_HOST environment variable
-// towards localhost:8085 that one could run this Docker image to emulate pubsub: oittaa/gcp-storage-emulator
+// towards localhost:9023 that one could run this Docker image to emulate pubsub: oittaa/gcp-storage-emulator
 func SetupStorageTest(tb testing.TB) func(tb testing.TB) {
 	// Setup test
 	createStorageCtx, cancel := context.WithTimeout(context.Background(), time.Second*10)
@@ -121,7 +121,7 @@ func SetupStorageTest(tb testing.TB) func(tb testing.TB) {
 	defer cancel()
 	if err := outputBucket.Create(createStorageCtx, "serverless-mapreduce", nil); err != nil &&
 		!strings.Contains(err.Error(), "already own this bucket") {
-		tb.Fatalf("Error creating inputBucket: %v", err)
+		tb.Fatalf("Error creating outputBucket: %v", err)
 	}
 
 	return func(tb testing.TB) {
@@ -138,9 +138,7 @@ func SetupStorageTest(tb testing.TB) func(tb testing.TB) {
 			if err != nil {
 				tb.Fatalf("Error listing output bucket: %v", err)
 			}
-			if err := inputBucket.Object(attrs.Name).Delete(deleteStorageCtx); err != nil {
-				tb.Fatalf("Error deleting object: %v", err)
-			}
+			_ = inputBucket.Object(attrs.Name).Delete(deleteStorageCtx)
 		}
 		// Delete the input bucket
 		if err := inputBucket.Delete(deleteStorageCtx); err != nil {
@@ -156,9 +154,7 @@ func SetupStorageTest(tb testing.TB) func(tb testing.TB) {
 			if err != nil {
 				tb.Fatalf("Error listing output bucket: %v", err)
 			}
-			if err := outputBucket.Object(attrs.Name).Delete(deleteStorageCtx); err != nil {
-				tb.Fatalf("Error deleting object: %v", err)
-			}
+			_ = outputBucket.Object(attrs.Name).Delete(deleteStorageCtx)
 		}
 		// Delete the output bucket
 		if err := outputBucket.Delete(deleteStorageCtx); err != nil {
