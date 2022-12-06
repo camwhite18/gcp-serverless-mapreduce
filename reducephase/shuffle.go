@@ -92,7 +92,7 @@ func partitioner(s string) int {
 func addToRedis(ctx context.Context, shuffledText map[int][]pubsub.MappedWord) error {
 	var err error
 	var wg sync.WaitGroup
-	// Loop through each reducer number and add the list of MappedWord objects to the appropriate redis instance
+	// Loop through each reducer number and add the list of MappedWord objects to the appropriate redis instance concurrently
 	for reducerNum := range shuffledText {
 		wg.Add(1)
 		go func(reducerNum int) {
