@@ -140,7 +140,7 @@ the bucket you provided as the output bucket):
 ```bash
 gsutil ls gs://$OUTPUT_BUCKET | grep -E "anagrams-part-[0-9]+.txt"
 ```
-Given that this project runs with 5 reducers, you should see 5 files in the output bucket. If you see less than 5 files, it
+If you deployed the project with 5 reducer jobs, you should see 5 files in the output bucket. If you see less than 5 files, it
 means that the reduce phase is still running.
 
 To retrieve the files, you can use the following command (where $OUTPUT_BUCKET is the name of the bucket you provided as the
