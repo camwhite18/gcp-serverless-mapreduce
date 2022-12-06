@@ -102,6 +102,14 @@ func TestStartMapReduce_EmptyInputBucketError(t *testing.T) {
 		!strings.Contains(err.Error(), "already own this bucket") {
 		t.Fatalf("Error creating inputBucket: %v", err)
 	}
+	// Delete the bucket after the test
+	defer func() {
+		deleteCtx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		defer cancel()
+		if err := inputBucket.Delete(deleteCtx); err != nil {
+			t.Fatalf("Error deleting inputBucket: %v", err)
+		}
+	}()
 
 	// When
 	StartMapReduce(rec, req)
