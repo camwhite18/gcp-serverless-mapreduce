@@ -23,14 +23,19 @@ const OutputBucketName = "test-bucket-output"
 // gcr.io/google.com/cloudsdktool/cloud-sdk:latest
 func SetupPubSubTest(tb testing.TB, topicIDs []string) (func(tb testing.TB), []*pubsub.Subscription) {
 	// Setup test
+	existingGCPProject := os.Getenv("GCP_PROJECT")
+	err := os.Setenv("GCP_PROJECT", "serverless-mapreduce")
+	if err != nil {
+		tb.Fatalf("Error setting environment variable: %v", err)
+	}
 	// Modify the PUBSUB_EMULATOR_HOST environment variable to point to the pubsub emulator
 	existingVal := os.Getenv("PUBSUB_EMULATOR_HOST")
-	err := os.Setenv("PUBSUB_EMULATOR_HOST", "localhost:8085")
+	err = os.Setenv("PUBSUB_EMULATOR_HOST", "localhost:8085")
 	if err != nil {
 		tb.Fatalf("Error setting environment variable: %v", err)
 	}
 	// Create a pubsub client so we can create a topic and subscription
-	ctx, cancel := context.WithTimeout(context.Background(), 10)
+	ctx, cancel := context.WithTimeout(context.Background(), 100)
 	defer cancel()
 	client, err := pubsub.NewClient(ctx, "serverless-mapreduce")
 	if err != nil {
@@ -67,6 +72,11 @@ func SetupPubSubTest(tb testing.TB, topicIDs []string) (func(tb testing.TB), []*
 		}
 		// Reset the PUBSUB_EMULATOR_HOST environment variable
 		err = os.Setenv("PUBSUB_EMULATOR_HOST", existingVal)
+		if err != nil {
+			tb.Fatalf("Error setting environment variable: %v", err)
+		}
+		// Reset the GCP_PROJECT environment variable
+		err = os.Setenv("GCP_PROJECT", existingGCPProject)
 		if err != nil {
 			tb.Fatalf("Error setting environment variable: %v", err)
 		}
