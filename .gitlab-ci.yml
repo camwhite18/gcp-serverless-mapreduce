@@ -45,4 +45,4 @@ deploy:
       - cp .env.example .env
       - make deploy
     only:
-      - master
+      - main
