@@ -17,7 +17,8 @@ type Response struct {
 }
 
 // StartMapReduce is a function triggered by an HTTP request which starts the MapReduce process. It reads all the file
-// names in the input bucket and pushes them to the splitter topic. The function requires two query parameters:
+// names in the input bucket and pushes them to the splitter topic, one filename per message. The function requires two
+// query parameters:
 // input-bucket: the name of the bucket containing the input files
 // output-bucket: the name of the bucket where the output files will be stored
 func StartMapReduce(w http.ResponseWriter, r *http.Request) {

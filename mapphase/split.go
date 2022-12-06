@@ -16,8 +16,9 @@ import (
 )
 
 // Splitter is a function that is triggered by a message being published to the splitter topic. It reads the file from
-// the bucket, splits it into partitions and sends the partitions to the Mapper. It requires the message data to be of
-// type SplitterData.
+// the bucket, removes the header and footer from the book, removes any duplicate words to improve performance later in
+// the MapReduce process, splits it into partitions and sends each partition to the Mapper in separate messages so they
+// can be mapped in parallel by different instances. It requires the message data to be of type SplitterData.
 func Splitter(ctx context.Context, e event.Event) error {
 	// Create a new pubsub client
 	pubsubClient, err := pubsub.New(ctx, e)
@@ -146,7 +147,7 @@ func partitionFile(splitText []string, messageSize int) [][]string {
 	return partitions
 }
 
-// sendTextToMapper sends the given text to the Mapper and can return an error
+// sendTextToMapper sends the given partitions to the Mapper, one partition per message and can return an error
 func sendTextToMapper(pubsubClient pubsub.Client, attributes map[string]string,
 	partitionedText [][]string) error {
 	// We need to use a wait group to wait for all the messages to be published before returning

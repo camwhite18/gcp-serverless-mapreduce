@@ -12,8 +12,11 @@ import (
 )
 
 // Shuffler is a function that is triggered by a message being published to the Shuffler topic. It receives a list of
-// MappedWord objects and shuffles them into a map of reducer number to a list of MappedWord objects. It then writes
-// each list of MappedWord objects to the appropriate redis instance. The sorting phase of MapReduce happens through how
+// MappedWord objects and shuffles them into a map of reducer number to a list of MappedWord objects. This is done through
+// the use of a hashing function. The reducer number is calculated by taking the modulus of the hashed key and the total
+// number of reducer jobs that will run. It then writes each list of MappedWord objects to the appropriate redis instance.
+//
+// The sorting phase of MapReduce happens through how
 // the data is stored in Redis - it is stored in lists meaning all the anagrams for a given word are stored together.
 // It then sends a message to the controller topic to let it know that the shuffling is complete for the partition.
 func Shuffler(ctx context.Context, e event.Event) error {
@@ -49,7 +52,7 @@ func Shuffler(ctx context.Context, e event.Event) error {
 }
 
 // shuffle takes a list of MappedWord objects and shuffles them into a map of reducer number to a list of MappedWord
-// objects
+// objects. This happens concurrently for each word through the use of goroutines which makes the process happen faster.
 func shuffle(wordData []pubsub.MappedWord) map[int][]pubsub.MappedWord {
 	shuffledText := make(map[int][]pubsub.MappedWord)
 	var mu sync.Mutex
@@ -77,7 +80,7 @@ func shuffle(wordData []pubsub.MappedWord) map[int][]pubsub.MappedWord {
 }
 
 // partitioner takes a word and returns the reducer number it should be sent to by taking the modulus of the
-// hashed word with the total number of reducers
+// hashed word with the total number of reducer jobs that will run
 func partitioner(s string) int {
 	// Create a new hash
 	h := fnv.New32a()
@@ -88,7 +91,7 @@ func partitioner(s string) int {
 }
 
 // addToRedis takes a map of reducer number to a list of MappedWord objects and adds each list of MappedWord objects
-// to the appropriate redis instance
+// to its respective Redis instance. This happens concurrently for each reducer number through the use of goroutines.
 func addToRedis(ctx context.Context, shuffledText map[int][]pubsub.MappedWord) error {
 	var err error
 	var wg sync.WaitGroup

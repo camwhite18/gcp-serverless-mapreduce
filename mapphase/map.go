@@ -11,7 +11,7 @@ import (
 
 // Mapper is a function that is triggered by a message being published to the Mapper topic. It reads the split text from
 // the message, pre-processes it, creates a key-value pair of the sorted word and the original word and sends the list
-// of key-value pairs for the received partition to the combiner. It requires the message data to be of type []string.
+// of key-value pairs for the received partition to the Combiner. It requires the message data to be of type []string.
 func Mapper(ctx context.Context, e event.Event) error {
 	// Create a new pubsub client
 	pubsubClient, err := pubsub.New(ctx, e)
@@ -53,8 +53,9 @@ func Mapper(ctx context.Context, e event.Event) error {
 	return nil
 }
 
-// mapWord maps a word to its sorted form and pushed the result onto the keyValue channel. It accepts a pointer to a
-// WaitGroup, a pointer to a sync.Mutex, a pointer to a slice of MappedWord and a string. It returns nothing.
+// mapWord maps a word to its sorted form and pushed the result onto the keyValue channel. If the word is empty after
+// pre-processing, it is discounted. It accepts a pointer to a WaitGroup, a pointer to a sync.Mutex, a pointer to a
+// slice of MappedWord and a string. It returns nothing.
 func mapWord(wg *sync.WaitGroup, keyValueChan chan pubsub.MappedWord, word string) {
 	defer wg.Done()
 	// Do some preprocessing on the word
@@ -74,8 +75,9 @@ func mapWord(wg *sync.WaitGroup, keyValueChan chan pubsub.MappedWord, word strin
 	keyValueChan <- pubsub.MappedWord{SortedWord: sortedWord, Anagrams: anagrams}
 }
 
-// preProcessWord receives a lowercase word and strips any punctuation from the word. It also removes a word if it is
-// a stop word or contains any numbers or symbols.
+// preProcessWord receives a lowercase word and strips any non-alphabetic characters from the start and end of the word.
+// If the word is a stop word, or still contains any non-alphabetic characters, it returns an empty string. Otherwise,
+// it returns the pre-processed word.
 func preProcessWord(word string) string {
 	// Use a map to replicate the functionality of a set since Go doesn't have a set data structure
 	stopwords := map[string]struct{}{"'tis": {}, "'twas": {}, "a": {}, "able": {}, "about": {}, "across": {},

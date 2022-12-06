@@ -10,14 +10,14 @@ import (
 	"log"
 	"sort"
 	"sync"
-	"time"
 )
 
-// Reducer is a function that is triggered by a message being published to the Reducer topic. It accesses a Redis
-// instance and reads the key-value pairs that were written by the shuffler. It then removes any duplicate anagrams,
-// sorts them alphabetically and writes the key-value pairs to a file in the output bucket.
+// Reducer is a function that is triggered by a message being published to the Reducer topic. It receives a message from
+// the controller with the number of the redis instance to read from and the name of the output bucket in the message
+// attributes. It then accesses the Redis instance and reads the sorted key-value pairs that were written by the
+// shuffler. At this point, any duplicate anagrams are removed and the remaining anagrams are sorted alphabetically, and
+// each key-value pair is written to a file in the output bucket if there is more than one anagram in the set.
 func Reducer(ctx context.Context, e event.Event) error {
-	start := time.Now()
 	r.InitMultiRedisClient()
 	// Create a new pubsub client
 	pubsubClient, err := pubsub.New(ctx, e)
@@ -49,12 +49,12 @@ func Reducer(ctx context.Context, e event.Event) error {
 	if err != nil {
 		return err
 	}
-	log.Printf("reducer %s took %v", redisNum, time.Since(start))
 	return nil
 }
 
-// reduceAnagramsFromRedis reads the key-value pairs from redis, reduces them and writes them to a file in the output
-// bucket. It uses a mutex to prevent race conditions when writing to the file.
+// reduceAnagramsFromRedis reads the key-value pairs from redis, removes duplicate anagrams and sorts them concurrently,
+// and then writes them to a file in the output bucket if there is more than one anagram in the set. It uses a mutex to
+// prevent race conditions when writing to the file.
 func reduceAnagramsFromRedis(ctx context.Context, outputBucket, fileName, redisNum string) error {
 	// Create a new storage client to write the output file
 	storageClient, err := storage.NewWithWriter(ctx, outputBucket, fileName)
@@ -98,7 +98,7 @@ func reduceAnagramsFromRedis(ctx context.Context, outputBucket, fileName, redisN
 	return err
 }
 
-// reduceAnagrams removes any duplicate anagrams from the slice
+// reduceAnagrams removes any duplicate anagrams from the slice by converting it to a map and then back to a slice
 func reduceAnagrams(values []string) []string {
 	var reducedAnagrams []string
 	// Create a map to ignore duplicate anagrams
