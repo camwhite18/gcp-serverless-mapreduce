@@ -174,7 +174,7 @@ func SetupRedisTest(tb testing.TB) func(tb testing.TB) {
 	// Replace the REDIS_HOSTS environment variable with localhost
 	existingRedisHostsVal := os.Getenv("REDIS_HOSTS")
 	var redisHosts []string
-	for i := 0; i < redis.NoOfRedisInstances; i++ {
+	for i := 0; i < redis.NoOfReducerJobs; i++ {
 		redisHosts = append(redisHosts, "localhost")
 	}
 	err = os.Setenv("REDIS_HOSTS", strings.Join(redisHosts, " "))

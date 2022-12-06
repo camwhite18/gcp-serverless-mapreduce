@@ -23,7 +23,7 @@ data is split, preprocessed, mapped to a key-value pair and combined at a per bo
 reduce phase, in which the key-value pairs are shuffled into redis instances based on a hash of the key, and then reduced
 together to find the anagrams.
 
-The whole process takes about 20 seconds to run on 100 books, which is about 43MB of data.
+The whole process takes under 20 seconds to run on 100 books, which is equivalent to ~43MB of data.
 
 ### Prerequisites
 
@@ -39,9 +39,10 @@ instructions [here](https://cloud.google.com/sdk/docs/quickstarts).
 ### Deployment
 
 The first step is to create a `.env` file and set the `GCP_PROJECT` variable to the name of the GCP project you wish to deploy 
-everything to, and the `GCP_REGION` variable to the region you wish to deploy to (you can find the list of available regions
-[here](https://cloud.google.com/compute/docs/regions-zones)). An example file `.env.example` is provided in the root of the
-project. You can copy it to `.env` and modify it to your needs using `cp .env.example .env`.
+everything to, the `GCP_REGION` variable to the region you wish to deploy to (you can find the list of available regions
+[here](https://cloud.google.com/compute/docs/regions-zones)), and the `NO_OF_REDUCERS` variable to the number of reducer 
+jobs you want to run (I used 5). An example file `.env.example` is provided in the root of the project. You can copy it 
+to `.env` and modify it to your needs using `cp .env.example .env`.
 
 Deploying the functions and Redis instances is extremely easy due to the Bash scripts provided in each directory. To run 
 these scripts, Make commands are provided. You can find the Makefile in the root directory of the project. The commands 
@@ -166,7 +167,7 @@ For more information on the tests, see below
 
 Before running any tests, you will need to run several Docker images that mock GCP cloud services used in the project.
 This includes an official image by Google `gcr.io/google.com/cloudsdktool/cloud-sdk:latest` which I use to mock the 
-PubSub service, and a open-source image `oittaa/gcp-storage-emulator` found 
+PubSub service, and an open-source image `oittaa/gcp-storage-emulator` found 
 [here](https://hub.docker.com/r/oittaa/gcp-storage-emulator) to mock Storage Buckets. I also use the official Redis 
 image `redis-stack:latest` to create a local Redis instance running in a Docker container.
 

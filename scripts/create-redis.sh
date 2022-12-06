@@ -35,8 +35,7 @@ fi
 ) &
 
 ( \
-num_reducers=5
-for ((i=0;i<num_reducers;i++)) do
+for ((i=0;i<"$NO_OF_REDUCERS";i++)) do
   ( \
   echo "Creating Redis instance mapreduce-redis-$i"
   if (gcloud redis instances create mapreduce-redis-"$i" \

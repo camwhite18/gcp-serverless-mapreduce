@@ -8,8 +8,7 @@ if ! [ -x "$(command -v gcloud)" ]; then
   exit 1
 fi
 ( \
-num_reducers=5
-for ((i=0;i<num_reducers;i++)) do
+for ((i=0;i<"$NO_OF_REDUCERS";i++)) do
   ( \
   echo "Deleting Redis instance mapreduce-redis-$i"
   if (gcloud redis instances delete mapreduce-redis-"$i" \
