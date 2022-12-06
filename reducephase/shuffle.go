@@ -7,10 +7,8 @@ import (
 	"gitlab.com/cameron_w20/serverless-mapreduce/pubsub"
 	r "gitlab.com/cameron_w20/serverless-mapreduce/redis"
 	"hash/fnv"
-	"log"
 	"strconv"
 	"sync"
-	"time"
 )
 
 // Shuffler is a function that is triggered by a message being published to the Shuffler topic. It receives a list of
@@ -19,7 +17,6 @@ import (
 // the data is stored in Redis - it is stored in lists meaning all the anagrams for a given word are stored together.
 // It then sends a message to the controller topic to let it know that the shuffling is complete for the partition.
 func Shuffler(ctx context.Context, e event.Event) error {
-	start := time.Now()
 	r.InitMultiRedisClient()
 	// Create a new pubsub client
 	pubsubClient, err := pubsub.New(ctx, e)
@@ -48,7 +45,6 @@ func Shuffler(ctx context.Context, e event.Event) error {
 		Status: pubsub.StatusFinished,
 	}
 	pubsubClient.SendPubSubMessage(pubsub.ControllerTopic, statusMessage, attributes)
-	log.Printf("Shuffling took %v", time.Since(start))
 	return nil
 }
 
