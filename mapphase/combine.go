@@ -8,7 +8,7 @@ import (
 
 // Combine is a function that is triggered by a message being published to the Combine topic. It receives the list of
 // key-value pairs from the mapper, and does a mini-reduce to group the key-value pairs by key. It requires the message
-// data to be of type []WordData.
+// data to be of type []MappedWord.
 func Combine(ctx context.Context, e event.Event) error {
 	// Create a new pubsub client
 	pubsubClient, err := pubsub.New(ctx, e)
