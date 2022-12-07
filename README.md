@@ -48,6 +48,10 @@ Deploying the functions and Redis instances is extremely easy due to the Bash sc
 these scripts, Make commands are provided. You can find the Makefile in the root directory of the project. The commands 
 are:
 
+**Note:** The commands are run from the root directory of the project.
+
+**Note:** When you receive the following message: `Allow unauthenticated invocations of new function [starter]? (y/N)` Choose `y`
+
 ```bash
 # Deploy all the functions and Redis instances
 make deploy
