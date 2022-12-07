@@ -72,6 +72,31 @@ make deploy-shuffler
 make deploy-reducer
 ```
 
+Once deployed, you should find the following resources in your GCP project:
+- Cloud Functions
+  - `controller`
+  - `starter`
+  - `splitter`
+  - `mapper`
+  - `combiner`
+  - `shuffler`
+  - `reducer`
+- Cloud Pub/Sub Topics
+  - `mapreduce-controller`
+  - `mapreduce-splitter`
+  - `mapreduce-mapper`
+  - `mapreduce-combiner`
+  - `mapreduce-shuffler`
+  - `mapreduce-reducer`
+- Cloud Memorystore for Redis
+  - N instances, where N is the number of reducers you specified in the `.env` file
+- Serverless VPC Access connector
+  - `mapreduce-connector`
+
+Here is a diagram of how the architecture is linked using 5 redis instances and thus 5 reduce jobs:
+
+![Architecture Diagram](./architecture.png)
+
 Similarly, you can delete the functions and Redis instances using the following commands:
 
 ```bash
@@ -140,8 +165,8 @@ the bucket you provided as the output bucket):
 ```bash
 gsutil ls gs://$OUTPUT_BUCKET | grep -E "anagrams-part-[0-9]+.txt"
 ```
-If you deployed the project with 5 reducer jobs, you should see 5 files in the output bucket. If you see less than 5 files, it
-means that the reduce phase is still running.
+If you deployed the project with 5 reducer jobs, you should see 5 files in the output bucket. In this case, if you see 
+less than 5 files, it means that the reduce phase is still running.
 
 To retrieve the files, you can use the following command (where $OUTPUT_BUCKET is the name of the bucket you provided as the
 output bucket):
@@ -150,7 +175,7 @@ gsutil -m cp -R gs://$OUTPUT_BUCKET .
 ```
 
 In each file, each line is in the format of `sorted_word: word1 word2 word3 ... wordN`, where {word1, word2, word3, ..., 
-wordN} is a set of sorted anagrams. For example:`aet: ate eat tea`.
+wordN} is a set of sorted anagrams. For example a line could be:`aet: ate eat tea`.
 
 ### Tests
 
