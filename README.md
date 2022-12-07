@@ -44,6 +44,17 @@ everything to, the `GCP_REGION` variable to the region you wish to deploy to (yo
 jobs you want to run (I used 5). An example file `.env.example` is provided in the root of the project. You can copy it 
 to `.env` and modify it to your needs using `cp .env.example .env`.
 
+You should then create two buckets in GCP Cloud Storage, one for the input data and one for the output data. You can 
+either do this using the GCP console or by using the following commands:
+
+```bash
+gsutil mb -p $GCP_PROJECT -l $GCP_REGION gs://$GCP_PROJECT-input
+gsutil mb -p $GCP_PROJECT -l $GCP_REGION gs://$GCP_PROJECT-output
+```
+
+These bucket names should then be used when starting the MapReduce process. See [running the Anagram MapReduce](#running-the-anagram-mapreduce)
+for more details.
+
 Deploying the functions and Redis instances is extremely easy due to the Bash scripts provided in each directory. To run 
 these scripts, Make commands are provided. You can find the Makefile in the root directory of the project. The commands 
 are:
