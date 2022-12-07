@@ -16,7 +16,9 @@
 
 This project is a Serverless MapReduce implementation to find anagrams in a set of Project Gutenberg books in the format
 of text files. The project is written in Go and uses GCP Cloud Functions, Cloud Pub/Sub, Cloud Storage and Cloud Memorystore 
-for Redis. The project was written for the 22COC105 Cloud Computing coursework.
+for Redis. I chose to write the project in Go as it is a language that is very fast, and easy to write concurrent code 
+in, thus allowing the MapReduce process to run at high speed. The project was written for the 22COC105 Cloud Computing 
+coursework.
 
 The project is split into 2 main parts as the MapReduce programming model follows. The first is the map phase, in which the
 data is split, preprocessed, mapped to a key-value pair and combined at a per book level (mini-reduce). The second is the 
