@@ -16,9 +16,9 @@ import (
 // the use of a hashing function. The reducer number is calculated by taking the modulus of the hashed key and the total
 // number of reducer jobs that will run. It then writes each list of MappedWord objects to the appropriate redis instance.
 //
-// The sorting phase of MapReduce happens through how
-// the data is stored in Redis - it is stored in lists meaning all the anagrams for a given word are stored together.
-// It then sends a message to the controller topic to let it know that the shuffling is complete for the partition.
+// The sorting phase of MapReduce happens through how the data is stored in Redis - it is stored in lists meaning all
+// the anagrams for a given word are stored together. It then sends a message to the controller topic to let it know
+// that the shuffling is complete for the partition.
 func Shuffler(ctx context.Context, e event.Event) error {
 	r.InitMultiRedisClient()
 	// Create a new pubsub client
