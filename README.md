@@ -47,7 +47,10 @@ jobs you want to run (I used 5). An example file `.env.example` is provided in t
 to `.env` and modify it to your needs using `cp .env.example .env`.
 
 You should then create two buckets in GCP Cloud Storage, one for the input data and one for the output data. You can 
-either do this using the GCP console or by using the following commands:
+either do this using the GCP console or by using the following commands (replace `$GCP_PROJECT` with the name of your GCP
+project and `$GCP_REGION` with the region you wish to store your data in):
+
+```bash
 
 ```bash
 gsutil mb -p $GCP_PROJECT -l $GCP_REGION gs://$GCP_PROJECT-input
