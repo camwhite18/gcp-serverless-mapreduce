@@ -63,9 +63,9 @@ func splitFile(ctx context.Context, bucketName, fileName string) ([][]string, er
 		return nil, fmt.Errorf("error reading file from bucket: %v", err)
 	}
 	// Remove the book header and footer from the data
-	data = removeBookHeaderAndFooter(data)
+	text := removeBookHeaderAndFooter(data)
 	// Split the file into a list of words
-	splitText := strings.Fields(string(data))
+	splitText := strings.Fields(text)
 	// Remove non-unique words:
 	uniqueSplitText := removeDuplicateWords(splitText)
 	// Partition the file since this will speed up the map phase
@@ -73,33 +73,34 @@ func splitFile(ctx context.Context, bucketName, fileName string) ([][]string, er
 	return partitionedText, nil
 }
 
-// removeBookHeaderAndFooter removes the header and footer from the given text and returns the text as a byte array
-func removeBookHeaderAndFooter(data []byte) []byte {
+// removeBookHeaderAndFooter removes the header and footer from the given byte array and returns the text as string
+func removeBookHeaderAndFooter(data []byte) string {
+	text := string(data)
 	// Create a regex to match the header
 	re := regexp.MustCompile(`\*\*\*.*START OF TH(E|IS) PROJECT GUTENBERG EBOOK.*\*\*\*`)
 	// Find the index of the occurrence of the header
-	index := re.FindStringIndex(string(data))
+	index := re.FindStringIndex(text)
 	// Remove the header
 	if index != nil {
-		data = data[index[1]+1:]
+		text = text[index[1]+1:]
 	}
 	// Create a regex to match the footer
 	// There are two different types of footer so we need to match both
 	re = regexp.MustCompile(`End of[ th(e|is)]* Project Gutenberg`)
-	index = re.FindStringIndex(string(data))
+	index = re.FindStringIndex(text)
 	if index != nil {
-		data = data[:index[0]]
-		return data
+		text = text[:index[0]]
+		return text
 	}
 	// Match the second type of footer
 	re = regexp.MustCompile(`\*\*\*.*END OF TH(E|IS) PROJECT GUTENBERG EBOOK.*\*\*\*`)
 	// Find the index of the occurrence of the footer
-	index = re.FindStringIndex(string(data))
+	index = re.FindStringIndex(text)
 	// Remove the footer
 	if index != nil {
-		data = data[:index[0]]
+		text = text[:index[0]]
 	}
-	return data
+	return text
 }
 
 // removeDuplicateWords removes any duplicate words from the given slice of strings and returns the slice of strings
