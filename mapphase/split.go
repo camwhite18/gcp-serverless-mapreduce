@@ -75,6 +75,7 @@ func splitFile(ctx context.Context, bucketName, fileName string) ([][]string, er
 
 // removeBookHeaderAndFooter removes the header and footer from the given byte array and returns the text as string
 func removeBookHeaderAndFooter(data []byte) string {
+	// Convert byte array to string, this ignores non-UTF8 characters
 	text := string(data)
 	// Create a regex to match the header
 	re := regexp.MustCompile(`\*\*\*.*START OF TH(E|IS) PROJECT GUTENBERG EBOOK.*\*\*\*`)
