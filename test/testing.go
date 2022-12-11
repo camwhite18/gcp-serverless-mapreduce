@@ -35,7 +35,7 @@ func SetupPubSubTest(tb testing.TB, topicIDs []string) (func(tb testing.TB), []*
 		tb.Fatalf("Error setting environment variable: %v", err)
 	}
 	// Create a pubsub client so we can create a topic and subscription
-	ctx, cancel := context.WithTimeout(context.Background(), 100)
+	ctx, cancel := context.WithTimeout(context.Background(), 10)
 	defer cancel()
 	client, err := pubsub.NewClient(ctx, "serverless-mapreduce")
 	if err != nil {

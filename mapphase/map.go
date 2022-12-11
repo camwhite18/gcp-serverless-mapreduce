@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"unicode"
 )
 
 // Mapper is a function that is triggered by a message being published to the Mapper topic. It reads the split text from
@@ -104,12 +105,22 @@ func preProcessWord(word string) string {
 		"would've": {}, "wouldn't": {}, "yet": {}, "you": {}, "you'd": {}, "you'll": {}, "you're": {}, "you've": {},
 		"your": {},
 	}
-	// Remove any punctuation from the start and end of the word
+	// Remove any punctuation and numbers from the start and end of the word
 	numbersAndSymbols := "0123456789*+-_&^%$#@!~`|}{[]\\:;\"'<>,.?/()="
 	word = strings.Trim(word, numbersAndSymbols)
-	// Remove the word if it is a stopword, or contains numbers or symbols
-	if _, ok := stopwords[word]; ok || strings.ContainsAny(word, numbersAndSymbols) {
+	// Remove the word if it is a stop-word, or contains non-alphabetic characters
+	if _, ok := stopwords[word]; ok || !containsOnlyLetters(word) {
 		return ""
 	}
 	return word
+}
+
+// containsOnlyLetters returns true if the string contains only alphabetic characters, and false otherwise.
+func containsOnlyLetters(word string) bool {
+	for _, char := range word {
+		if !unicode.IsLetter(char) {
+			return false
+		}
+	}
+	return true
 }

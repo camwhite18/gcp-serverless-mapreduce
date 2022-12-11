@@ -236,8 +236,8 @@ func TestSplitter_CreatePubSubClientError(t *testing.T) {
 
 func TestRemoveBookHeaderAndFooter(t *testing.T) {
 	// Given
-	inputText := []byte(`#SOME BOOK HEADER# *** START OF THIS PROJECT GUTENBERG EBOOK SOME TITLE *** The quick brown fox jumps over the lazy dog.
-*** END OF THE PROJECT GUTENBERG EBOOK SOME TITLE *** #SOME BOOK FOOTER#`)
+	inputText := `#SOME BOOK HEADER# *** START OF THIS PROJECT GUTENBERG EBOOK SOME TITLE *** The quick brown fox jumps over the lazy dog.
+*** END OF THE PROJECT GUTENBERG EBOOK SOME TITLE *** #SOME BOOK FOOTER#`
 	expectedResult := "The quick brown fox jumps over the lazy dog.\n"
 
 	// When
@@ -249,9 +249,9 @@ func TestRemoveBookHeaderAndFooter(t *testing.T) {
 
 func TestRemoveBookHeaderAndFooter_AlternativeFooter(t *testing.T) {
 	// Given
-	inputText := []byte(`#SOME BOOK HEADER# *** START OF THIS PROJECT GUTENBERG EBOOK SOME TITLE *** The quick brown fox jumps over the lazy dog.
+	inputText := `#SOME BOOK HEADER# *** START OF THIS PROJECT GUTENBERG EBOOK SOME TITLE *** The quick brown fox jumps over the lazy dog.
 End of Project Gutenberg's Some Title, by Some Author
-*** END OF THE PROJECT GUTENBERG EBOOK SOME TITLE *** #SOME BOOK FOOTER#`)
+*** END OF THE PROJECT GUTENBERG EBOOK SOME TITLE *** #SOME BOOK FOOTER#`
 	expectedResult := "The quick brown fox jumps over the lazy dog.\n"
 
 	// When

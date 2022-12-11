@@ -43,6 +43,7 @@ deploy:
     stage: deploy
     script:
       - cp .env.example .env
+      - make remove
       - make deploy
     only:
       - main

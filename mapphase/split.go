@@ -63,7 +63,7 @@ func splitFile(ctx context.Context, bucketName, fileName string) ([][]string, er
 		return nil, fmt.Errorf("error reading file from bucket: %v", err)
 	}
 	// Remove the book header and footer from the data
-	text := removeBookHeaderAndFooter(data)
+	text := removeBookHeaderAndFooter(bytesToUtf8String(data))
 	// Split the file into a list of words
 	splitText := strings.Fields(text)
 	// Remove non-unique words:
@@ -73,10 +73,21 @@ func splitFile(ctx context.Context, bucketName, fileName string) ([][]string, er
 	return partitionedText, nil
 }
 
-// removeBookHeaderAndFooter removes the header and footer from the given byte array and returns the text as string
-func removeBookHeaderAndFooter(data []byte) string {
-	// Convert byte array to string, this ignores non-UTF8 characters
-	text := string(data)
+// bytesToUtf8String converts a slice of bytes to a string. It can also converts characters encoded in non-UTF8 format
+// to UTF8.
+func bytesToUtf8String(data []byte) string {
+	// Create a slice to store the converted bytes
+	buf := make([]rune, len(data))
+	// Loop through the bytes and convert them to UTF8
+	for i, char := range data {
+		buf[i] = rune(char)
+	}
+	// Convert the slice of runes to a string
+	return string(buf)
+}
+
+// removeBookHeaderAndFooter removes the header and footer from the given string and returns the text as a string
+func removeBookHeaderAndFooter(text string) string {
 	// Create a regex to match the header
 	re := regexp.MustCompile(`\*\*\*.*START OF TH(E|IS) PROJECT GUTENBERG EBOOK.*\*\*\*`)
 	// Find the index of the occurrence of the header
