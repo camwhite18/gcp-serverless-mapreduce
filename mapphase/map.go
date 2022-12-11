@@ -117,7 +117,9 @@ func preProcessWord(word string) string {
 
 // containsOnlyLetters returns true if the string contains only alphabetic characters, and false otherwise.
 func containsOnlyLetters(word string) bool {
+	// Loop through each character in the word
 	for _, char := range word {
+		// If the character is not an alphabetic character, return false
 		if !unicode.IsLetter(char) {
 			return false
 		}
