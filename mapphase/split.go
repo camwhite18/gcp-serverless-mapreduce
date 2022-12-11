@@ -73,7 +73,7 @@ func splitFile(ctx context.Context, bucketName, fileName string) ([][]string, er
 	return partitionedText, nil
 }
 
-// bytesToUtf8String converts a slice of bytes to a string. It can also converts characters encoded in non-UTF8 format
+// bytesToUtf8String converts a slice of bytes to a string. It also converts characters encoded in non-UTF8 format
 // to UTF8.
 func bytesToUtf8String(data []byte) string {
 	// Create a slice to store the converted bytes

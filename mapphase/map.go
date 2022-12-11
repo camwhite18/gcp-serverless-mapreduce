@@ -105,14 +105,37 @@ func preProcessWord(word string) string {
 		"would've": {}, "wouldn't": {}, "yet": {}, "you": {}, "you'd": {}, "you'll": {}, "you're": {}, "you've": {},
 		"your": {},
 	}
-	// Remove any punctuation and numbers from the start and end of the word
-	numbersAndSymbols := "0123456789*+-_&^%$#@!~`|}{[]\\:;\"'<>,.?/()="
-	word = strings.Trim(word, numbersAndSymbols)
-	// Remove the word if it is a stop-word, or contains non-alphabetic characters
+	// Remove any non-Unicode letters from the start and end of the word
+	word = trimNonAlphabeticCharacters(word)
+	// Remove the word if it is a stop-word, or contains non-Unicode letters
 	if _, ok := stopwords[word]; ok || !containsOnlyLetters(word) {
 		return ""
 	}
 	return word
+}
+
+// trimNonAlphabeticCharacters receives a string and removes any non-Unicode letters from the start and end of the string.
+func trimNonAlphabeticCharacters(word string) string {
+	// Convert the string to a rune slice
+	chars := []rune(word)
+	// Trim non-alphabetic characters from the start of the word
+	for i := 0; i < len(chars)-1; i++ {
+		// If the character is a letter, slice the word from the start of the word to the current index then break
+		if unicode.IsLetter(chars[i]) {
+			chars = chars[i:]
+			break
+		}
+	}
+	// Trim non-alphabetic characters from the end of the word
+	for i := len(chars) - 1; i >= 0; i-- {
+		// If the character is a letter, slice the word from the current index to the end of the word then break
+		if unicode.IsLetter(chars[i]) {
+			chars = chars[:i+1]
+			break
+		}
+	}
+	// Convert the rune slice back to a string and return it
+	return string(chars)
 }
 
 // containsOnlyLetters returns true if the string contains only alphabetic characters, and false otherwise.

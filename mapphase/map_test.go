@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gitlab.com/cameron_w20/serverless-mapreduce/pubsub"
 	"gitlab.com/cameron_w20/serverless-mapreduce/test"
+	"log"
 	"testing"
 	"time"
 )
@@ -163,6 +164,20 @@ func TestProcessTextStopWord(t *testing.T) {
 
 	// When
 	actualResult := preProcessWord(inputText)
+
+	// Then
+	assert.Equal(t, expectedResult, actualResult)
+}
+
+func TestTrimNonAlphabetic(t *testing.T) {
+	// Given
+	inputText := ";'.[]/,'][çteststringç];/];];/'"
+	expectedResult := "çteststringç"
+	str := "test"
+	log.Printf("w: %s", str[:1])
+
+	// When
+	actualResult := trimNonAlphabeticCharacters(inputText)
 
 	// Then
 	assert.Equal(t, expectedResult, actualResult)
