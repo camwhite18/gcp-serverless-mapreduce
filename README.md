@@ -51,8 +51,6 @@ either do this using the GCP console or by using the following commands (replace
 project and `$GCP_REGION` with the region you wish to store your data in):
 
 ```bash
-
-```bash
 gsutil mb -p $GCP_PROJECT -l $GCP_REGION gs://$GCP_PROJECT-input
 gsutil mb -p $GCP_PROJECT -l $GCP_REGION gs://$GCP_PROJECT-output
 ```
